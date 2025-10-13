@@ -1,7 +1,10 @@
+// src/app/(auth)/login/page.tsx
 import { Suspense } from 'react';
-import LoginClient from './LoginClient';
+import LoginClient from './login-client';
 
-export default function LoginPage() {
+export const dynamic = 'force-dynamic';
+
+export default function Page() {
   return (
     <Suspense fallback={null}>
       <LoginClient />

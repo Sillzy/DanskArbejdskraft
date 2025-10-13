@@ -1,3 +1,4 @@
+//src/app/(auth)/signup/signup-client.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
