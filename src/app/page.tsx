@@ -27,7 +27,7 @@ export default function Page() {
         {/* 50% transparent background image */}
         <div className="absolute inset-0 -z-10">
           <Image
-            src="/BaggrundDanskarbejdsKraft.png"
+            src="/BaggrundDanskarbejdskraft.png"
             alt=""
             fill
             priority
