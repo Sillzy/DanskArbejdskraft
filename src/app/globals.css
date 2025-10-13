@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+:root {
+  --primary-blue: #0ea5e9;
+  --navy: #1e40af;
+  --light-bg: #f8fafc;
+  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+body { 
+  font-family: 'Inter', sans-serif; 
+}
+
+.hero-bg { 
+  background: linear-gradient(rgba(30, 64, 175, 0.7), rgba(30, 64, 175, 0.7)), url('/hero-construction.jpg'); 
+  background-size: cover; 
+  background-position: center; 
+}
+
+.stat-badge { 
+  @apply inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-800; 
+}
+
+.service-card { 
+  @apply bg-white rounded-xl shadow-lg p-6 border border-gray-100; 
+}

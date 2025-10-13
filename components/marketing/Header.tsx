@@ -1,0 +1,340 @@
+// components/marketing/Header.tsx
+'use client';
+
+import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { ChevronDown, Menu as MenuIcon, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useSession } from '@/../hooks/useSession';
+import { supabase } from '@/../lib/supabaseClient';
+
+type Item = { label: string; href: string; desc?: string };
+
+const services: Item[] = [
+  { label: 'Midlertidigt personale', href: '/services/temporary-staff' },
+  { label: 'Projektbaserede hold', href: '/services/project-based-crews' },
+  { label: 'Entrepriseprojekt', href: '/services/enterprise-project' },
+  { label: 'Smart tidsregistrering', href: '/services/smart-time-registration' },
+];
+
+const fields: Item[] = [
+  { label: 'Beton & fundament', href: '/industries/concrete-foundation' },
+  { label: 'Murerarbejde', href: '/industries/bricklaying' },
+  { label: 'Truckførere', href: '/industries/forklift-drivers' },
+  { label: 'Maskinførere til tungt materiel', href: '/industries/heavy-machinery-operators' },
+  { label: 'VVS-montør', href: '/industries/plumber' },
+  { label: 'Tagdækker', href: '/industries/roofer' },
+  { label: 'Svejsere', href: '/industries/welder' },
+  { label: 'Stålmontør', href: '/industries/ironworker' },
+  { label: 'Tømrerarbejde', href: '/industries/carpentry' },
+  { label: 'Isolatør', href: '/industries/insulation-installer' },
+];
+
+const about: Item[] = [{ label: 'Mød teamet', href: '/about/meet-the-team' }];
+const contact: Item[] = [{ label: 'Kontor', href: '/contact/office' }];
+
+function NavMenu({ label, items }: { label: string; items: Item[] }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        className="inline-flex items-center gap-1 text-gray-700 hover:text-navy"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={() => setOpen((s) => !s)}
+        type="button"
+      >
+        {label}
+        <ChevronDown className="h-4 w-4" />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.16 }}
+            className="absolute left-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-xl"
+            role="menu"
+          >
+            <ul className="py-2">
+              {items.map((it) => (
+                <li key={it.href}>
+                  <Link
+                    className="block px-4 py-2.5 text-sm hover:bg-gray-50"
+                    href={it.href}
+                    role="menuitem"
+                    prefetch={false}
+                    onClick={() => setOpen(false)}
+                  >
+                    <div className="font-medium text-gray-900">{it.label}</div>
+                    {it.desc && <div className="text-xs text-gray-500">{it.desc}</div>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export default function Header() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileSub, setMobileSub] = useState<string | null>(null);
+  const session = useSession();
+  const router = useRouter();
+
+  // NEW: isAdmin state (via RPC is_admin(uuid))
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!session?.user?.id) {
+        setIsAdmin(false);
+        return;
+      }
+      const { data, error } = await supabase.rpc('is_admin', { p_uid: session.user.id });
+      if (!cancelled) setIsAdmin(!error && !!data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    router.replace('/'); // or '/login'
+  };
+
+  const mobileSection = (title: string, items: Item[]) => (
+    <div className="border-t border-gray-200">
+      <button
+        className="flex w-full items-center justify-between px-4 py-3 text-left font-medium"
+        onClick={() => setMobileSub(mobileSub === title ? null : title)}
+        type="button"
+      >
+        {title}
+        <ChevronDown
+          className={`h-4 w-4 transition ${mobileSub === title ? 'rotate-180' : ''}`}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {mobileSub === title && (
+          <motion.ul
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden px-2 pb-2"
+          >
+            {items.map((it) => (
+              <li key={it.href}>
+                <Link
+                  onClick={() => setMobileOpen(false)}
+                  className="block rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  href={it.href}
+                  prefetch={false}
+                >
+                  {it.label}
+                </Link>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
+  return (
+    <nav className="fixed top-0 z-50 w-full h-16 md:h-20 border-b border-slate-200 bg-slate-50/95 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 shadow-sm">
+      <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-4">
+        {/* Brand with logo */}
+        <Link href="/" className="flex items-center" prefetch={false}>
+          <Image
+            src="/Logo.png"
+            alt="Dansk Arbejdskraft logo"
+            width={200}
+            height={60}
+            priority
+            className="h-10 w-auto md:h-12 object-contain ml-6 md:ml-10"
+          />
+        </Link>
+
+        {/* desktop */}
+        <div className="hidden items-center gap-8 md:flex">
+          <NavMenu label="Ydelser" items={services} />
+          <NavMenu label="Fagområder" items={fields} />
+          <NavMenu label="Om os" items={about} />
+          <NavMenu label="Kontakt" items={contact} />
+        </div>
+
+        {/* actions */}
+        <div className="hidden items-center gap-3 md:flex">
+          {session ? (
+            <>
+              {/* Admin button (only for admins) */}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  prefetch={false}
+                  className="rounded-lg border border-amber-500 px-5 py-2 text-amber-600 hover:bg-amber-50"
+                >
+                  Admin
+                </Link>
+              )}
+
+              <Link
+                href="/dashboard"
+                prefetch={false}
+                className="rounded-lg border border-blue-500 px-5 py-2 text-blue-500 hover:bg-blue-50"
+              >
+                Min side
+              </Link>
+              <button
+                onClick={logout}
+                className="rounded-lg bg-blue-500 px-5 py-2 text-white hover:bg-blue-600"
+                type="button"
+              >
+                Log ud
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/signup?next=/dashboard/onboarding"
+                prefetch={false}
+                className="rounded-lg border border-blue-500 px-5 py-2 text-blue-500 hover:bg-blue-50"
+              >
+                Bliv medarbejder
+              </Link>
+              <Link
+                href="/login"
+                prefetch={false}
+                className="rounded-lg bg-blue-500 px-5 py-2 text-white hover:bg-blue-600"
+              >
+                Log ind
+              </Link>
+            </>
+          )}
+        </div>
+
+        {/* mobile trigger */}
+        <button
+          className="md:hidden"
+          aria-label="Åbn menu"
+          onClick={() => setMobileOpen(true)}
+          type="button"
+        >
+          <MenuIcon className="h-6 w-6" />
+        </button>
+      </div>
+
+      {/* mobile sheet */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            className="fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-white shadow-2xl md:hidden"
+          >
+            <div className="flex items-center justify-between border-b px-4 py-4">
+              <Link
+                href="/"
+                className="flex items-center gap-2"
+                onClick={() => setMobileOpen(false)}
+                prefetch={false}
+              >
+                <Image
+                  src="/Logo.png"
+                  alt="Dansk Arbejdskraft logo"
+                  width={28}
+                  height={28}
+                  className="h-7 w-7 rounded-sm"
+                />
+                <span className="font-semibold">Dansk Arbejdskraft</span>
+              </Link>
+              <button
+                aria-label="Luk menu"
+                onClick={() => setMobileOpen(false)}
+                type="button"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {mobileSection('Ydelser', services)}
+            {mobileSection('Fagområder', fields)}
+            {mobileSection('Om os', about)}
+            {mobileSection('Kontakt', contact)}
+
+            <div className="border-t px-4 py-4">
+              <div className="flex flex-col gap-3">
+                {session ? (
+                  <>
+                    {isAdmin && (
+                      <Link
+                        href="/admin"
+                        prefetch={false}
+                        onClick={() => setMobileOpen(false)}
+                        className="rounded-lg border border-amber-500 px-5 py-2 text-center text-amber-600 hover:bg-amber-50"
+                      >
+                        Admin
+                      </Link>
+                    )}
+                    <Link
+                      href="/dashboard"
+                      prefetch={false}
+                      onClick={() => setMobileOpen(false)}
+                      className="rounded-lg border border-blue-500 px-5 py-2 text-center text-blue-500 hover:bg-blue-50"
+                    >
+                      Profil
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setMobileOpen(false);
+                        logout();
+                      }}
+                      className="rounded-lg bg-blue-500 px-5 py-2 text-center text-white hover:bg-blue-600"
+                      type="button"
+                    >
+                      Log ud
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href="/login"
+                      prefetch={false}
+                      onClick={() => setMobileOpen(false)}
+                      className="rounded-lg bg-blue-500 px-5 py-2 text-center text-white hover:bg-blue-600"
+                    >
+                      Log ind
+                    </Link>
+                    <Link
+                      href="/signup?next=/dashboard/onboarding"
+                      prefetch={false}
+                      onClick={() => setMobileOpen(false)}
+                      className="rounded-lg border border-blue-500 px-5 py-2 text-center text-blue-500 hover:bg-blue-50"
+                    >
+                      Bliv medarbejder
+                    </Link>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </nav>
+  );
+}
