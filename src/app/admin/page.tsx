@@ -64,8 +64,8 @@ export default async function AdminPage() {
   // Approved workers
   const { data: workers = [] } = await supabase
     .from('profiles')
-    .select('user_id, first_name, last_name, email, phone, bank_reg_no, bank_account_no, swift, iban, team_approved')
-    .eq('team_approved', true)
+    .select('user_id, first_name, last_name, email, phone, bank_reg_no, bank_account_no, swift, iban, profile_status')
+    .eq('profile_status', 'approved')         // <— was .eq('team_approved', true)
     .order('first_name', { ascending: true });
 
   const approvedIds = (workers as any[]).map((w) => w.user_id as string);

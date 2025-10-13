@@ -1,3 +1,4 @@
+//src/app/admin/team/ProfileEditorRow.tsx
 'use client';
 
 import * as React from 'react';

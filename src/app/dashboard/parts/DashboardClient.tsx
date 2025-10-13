@@ -1,3 +1,4 @@
+//src/app/dashboard/parts/DashboardClient.tsx
 'use client';
 
 import * as React from 'react';
@@ -197,7 +198,7 @@ function BigTile({
   );
 }
 
-/* ---------------------------- Register Time Modal ---------------------------- */
+/* ---------------------------- Register Time Modal (mobile-safe) ---------------------------- */
 function RegisterTimeModal({
   open,
   onClose,
@@ -241,7 +242,7 @@ function RegisterTimeModal({
   function openPicker(ref: React.RefObject<HTMLInputElement>) {
     const el = ref.current;
     if (!el) return;
-    // @ts-expect-error experimental
+    // @ts-expect-error showPicker is supported on modern iOS/Chrome
     if (typeof el.showPicker === 'function') el.showPicker();
     el.focus();
   }
@@ -279,6 +280,15 @@ function RegisterTimeModal({
 
   if (!open) return null;
 
+  // Shared styles so inputs never overflow rounded boxes on iOS
+  const fieldWrap =
+    'rounded-2xl border p-4 sm:p-5 overflow-hidden cursor-pointer bg-white';
+  const fieldInput =
+    'w-full h-16 sm:h-20 rounded-xl border px-4 text-2xl text-center ' +
+    'focus:outline-none focus:ring-2 focus:ring-blue-200 ' +
+    'appearance-none [-webkit-appearance:none] [-moz-appearance:textfield] ' +
+    'bg-white';
+
   return (
     <div className="fixed inset-0 z-[80]">
       <div className="absolute inset-0 bg-black/40" onClick={() => onClose()} />
@@ -292,53 +302,49 @@ function RegisterTimeModal({
         )}
 
         <div className="mt-6 grid grid-cols-1 gap-5">
-          <div
-            className="rounded-2xl border p-4 sm:p-5 cursor-pointer"
-            onClick={() => openPicker(dateRef)}
-          >
+          {/* Date */}
+          <div className={fieldWrap} onClick={() => openPicker(dateRef)}>
             <label className="block text-slate-600 text-base mb-2">Date</label>
             <input
               ref={dateRef}
               type="date"
-              className="w-full rounded-xl border p-4 text-xl sm:text-2xl tracking-wide"
+              className={fieldInput}
               value={workDate}
               onChange={(e) => setWorkDate(e.target.value)}
+              readOnly
             />
           </div>
 
+          {/* Times */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div
-              className="rounded-2xl border p-4 sm:p-5 cursor-pointer"
-              onClick={() => openPicker(startRef)}
-            >
+            <div className={fieldWrap} onClick={() => openPicker(startRef)}>
               <label className="block text-slate-600 text-base mb-2">
                 Start time
               </label>
               <input
                 ref={startRef}
                 type="time"
-                className="w-full rounded-xl border p-4 text-2xl h-16 sm:h-20 text-center"
+                className={fieldInput}
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
+                readOnly
               />
               <p className="mt-2 text-xs text-slate-500">
                 Tap anywhere on this box to open the time wheel
               </p>
             </div>
 
-            <div
-              className="rounded-2xl border p-4 sm:p-5 cursor-pointer"
-              onClick={() => openPicker(endRef)}
-            >
+            <div className={fieldWrap} onClick={() => openPicker(endRef)}>
               <label className="block text-slate-600 text-base mb-2">
                 End time
               </label>
               <input
                 ref={endRef}
                 type="time"
-                className="w-full rounded-xl border p-4 text-2xl h-16 sm:h-20 text-center"
+                className={fieldInput}
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
+                readOnly
               />
               <p className="mt-2 text-xs text-slate-500">
                 Tap anywhere on this box to open the time wheel
@@ -346,21 +352,37 @@ function RegisterTimeModal({
             </div>
           </div>
 
-          <div className="rounded-2xl border p-4 sm:p-5">
+          {/* Break select */}
+          <div className="rounded-2xl border p-4 sm:p-5 bg-white">
             <label className="block text-slate-600 text-base mb-2">
               Break (minutes)
             </label>
-            <select
-              className="w-full rounded-xl border p-4 text-xl h-16"
-              value={breakMin}
-              onChange={(e) => setBreakMin(parseInt(e.target.value, 10))}
-            >
-              {[0, 15, 30, 45, 60, 75, 90].map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                className={
+                  'w-full h-16 rounded-xl border p-4 text-xl pr-10 ' +
+                  'bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 ' +
+                  'appearance-none [-webkit-appearance:none]'
+                }
+                value={breakMin}
+                onChange={(e) => setBreakMin(parseInt(e.target.value, 10))}
+              >
+                {[0, 15, 30, 45, 60, 75, 90].map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              {/* chevron */}
+              <svg
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M5.5 7l4.5 4.5L14.5 7z" />
+              </svg>
+            </div>
           </div>
         </div>
 

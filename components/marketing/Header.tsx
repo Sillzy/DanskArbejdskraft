@@ -35,6 +35,24 @@ const fields: Item[] = [
 const about: Item[] = [{ label: 'Mød teamet', href: '/about/meet-the-team' }];
 const contact: Item[] = [{ label: 'Kontor', href: '/contact/office' }];
 
+/* ---------- Small helpers ---------- */
+
+function Brand({ size = 48 }: { size?: number }) {
+  return (
+    <Link href="/" className="inline-flex items-center" prefetch={false}>
+      <Image
+        src="/Logo.png"                 // /public/Logo.png
+        alt="Dansk Arbejdskraft"
+        width={size * 4}
+        height={size}
+        priority
+        className="h-10 w-auto md:h-12"
+      />
+      <span className="sr-only">Dansk Arbejdskraft</span>
+    </Link>
+  );
+}
+
 function NavMenu({ label, items }: { label: string; items: Item[] }) {
   const [open, setOpen] = useState(false);
 
@@ -62,7 +80,7 @@ function NavMenu({ label, items }: { label: string; items: Item[] }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 6 }}
             transition={{ duration: 0.16 }}
-            className="absolute left-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-xl"
+            className="absolute left-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-xl z-50"
             role="menu"
           >
             <ul className="py-2">
@@ -88,13 +106,15 @@ function NavMenu({ label, items }: { label: string; items: Item[] }) {
   );
 }
 
+/* ---------- Header ---------- */
+
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileSub, setMobileSub] = useState<string | null>(null);
   const session = useSession();
   const router = useRouter();
 
-  // NEW: isAdmin state (via RPC is_admin(uuid))
+  // Admin state via RPC is_admin(uuid)
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -106,18 +126,16 @@ export default function Header() {
       const { data, error } = await supabase.rpc('is_admin', { p_uid: session.user.id });
       if (!cancelled) setIsAdmin(!error && !!data);
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [session?.user?.id]);
 
   const logout = async () => {
     await supabase.auth.signOut();
-    router.replace('/'); // or '/login'
+    router.replace('/');
   };
 
   const mobileSection = (title: string, items: Item[]) => (
-    <div className="border-t border-gray-200">
+    <div className="border-t border-gray-200 bg-white">
       <button
         className="flex w-full items-center justify-between px-4 py-3 text-left font-medium"
         onClick={() => setMobileSub(mobileSub === title ? null : title)}
@@ -134,7 +152,7 @@ export default function Header() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden px-2 pb-2"
+            className="overflow-hidden px-2 pb-2 bg-white"
           >
             {items.map((it) => (
               <li key={it.href}>
@@ -155,21 +173,20 @@ export default function Header() {
   );
 
   return (
-    <nav className="fixed top-0 z-50 w-full h-16 md:h-20 border-b border-slate-200 bg-slate-50/95 backdrop-blur supports-[backdrop-filter]:bg-slate-50/80 shadow-sm">
-      <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-4">
-        {/* Brand with logo */}
-        <Link href="/" className="flex items-center" prefetch={false}>
-          <Image
-            src="/Logo.png"
-            alt="Dansk Arbejdskraft logo"
-            width={200}
-            height={60}
-            priority
-            className="h-10 w-auto md:h-12 object-contain ml-6 md:ml-10"
-          />
-        </Link>
+    <header
+      className="
+        sticky top-0 z-50
+        bg-white shadow-sm
+        border-b border-slate-200
+        supports-[backdrop-filter]:bg-white/90 supports-[backdrop-filter]:backdrop-blur
+      "
+      role="banner"
+    >
+      <nav className="mx-auto flex h-16 md:h-20 max-w-7xl items-center justify-between px-4">
+        {/* Brand */}
+        <Brand />
 
-        {/* desktop */}
+        {/* desktop nav */}
         <div className="hidden items-center gap-8 md:flex">
           <NavMenu label="Ydelser" items={services} />
           <NavMenu label="Fagområder" items={fields} />
@@ -177,11 +194,10 @@ export default function Header() {
           <NavMenu label="Kontakt" items={contact} />
         </div>
 
-        {/* actions */}
+        {/* desktop actions */}
         <div className="hidden items-center gap-3 md:flex">
           {session ? (
             <>
-              {/* Admin button (only for admins) */}
               {isAdmin && (
                 <Link
                   href="/admin"
@@ -191,7 +207,6 @@ export default function Header() {
                   Admin
                 </Link>
               )}
-
               <Link
                 href="/dashboard"
                 prefetch={false}
@@ -236,105 +251,111 @@ export default function Header() {
         >
           <MenuIcon className="h-6 w-6" />
         </button>
-      </div>
+      </nav>
 
-      {/* mobile sheet */}
+      {/* MOBILE OVERLAY + SHEET */}
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            className="fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-white shadow-2xl md:hidden"
-          >
-            <div className="flex items-center justify-between border-b px-4 py-4">
-              <Link
-                href="/"
-                className="flex items-center gap-2"
-                onClick={() => setMobileOpen(false)}
-                prefetch={false}
-              >
-                <Image
-                  src="/Logo.png"
-                  alt="Dansk Arbejdskraft logo"
-                  width={28}
-                  height={28}
-                  className="h-7 w-7 rounded-sm"
-                />
-                <span className="font-semibold">Dansk Arbejdskraft</span>
-              </Link>
-              <button
-                aria-label="Luk menu"
-                onClick={() => setMobileOpen(false)}
-                type="button"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
+          <div className="md:hidden">
+            {/* dark backdrop behind the sheet */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black"
+              onClick={() => setMobileOpen(false)}
+            />
 
-            {mobileSection('Ydelser', services)}
-            {mobileSection('Fagområder', fields)}
-            {mobileSection('Om os', about)}
-            {mobileSection('Kontakt', contact)}
+            {/* the sheet */}
+            <motion.nav
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.2 }}
+              className="
+                fixed right-0 top-0 z-50 w-full max-w-sm
+                h-dvh overflow-y-auto
+                bg-white shadow-2xl
+              "
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-4 py-4">
+                <Brand size={32} />
+                <button
+                  aria-label="Luk menu"
+                  onClick={() => setMobileOpen(false)}
+                  type="button"
+                  className="p-2"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
 
-            <div className="border-t px-4 py-4">
-              <div className="flex flex-col gap-3">
-                {session ? (
-                  <>
-                    {isAdmin && (
+              {mobileSection('Ydelser', services)}
+              {mobileSection('Fagområder', fields)}
+              {mobileSection('Om os', about)}
+              {mobileSection('Kontakt', contact)}
+
+              <div className="border-t px-4 py-4 bg-white">
+                <div className="flex flex-col gap-3">
+                  {session ? (
+                    <>
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          prefetch={false}
+                          onClick={() => setMobileOpen(false)}
+                          className="rounded-lg border border-amber-500 px-5 py-2 text-center text-amber-600 hover:bg-amber-50"
+                        >
+                          Admin
+                        </Link>
+                      )}
                       <Link
-                        href="/admin"
+                        href="/dashboard"
                         prefetch={false}
                         onClick={() => setMobileOpen(false)}
-                        className="rounded-lg border border-amber-500 px-5 py-2 text-center text-amber-600 hover:bg-amber-50"
+                        className="rounded-lg border border-blue-500 px-5 py-2 text-center text-blue-500 hover:bg-blue-50"
                       >
-                        Admin
+                        Profil
                       </Link>
-                    )}
-                    <Link
-                      href="/dashboard"
-                      prefetch={false}
-                      onClick={() => setMobileOpen(false)}
-                      className="rounded-lg border border-blue-500 px-5 py-2 text-center text-blue-500 hover:bg-blue-50"
-                    >
-                      Profil
-                    </Link>
-                    <button
-                      onClick={() => {
-                        setMobileOpen(false);
-                        logout();
-                      }}
-                      className="rounded-lg bg-blue-500 px-5 py-2 text-center text-white hover:bg-blue-600"
-                      type="button"
-                    >
-                      Log ud
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      href="/login"
-                      prefetch={false}
-                      onClick={() => setMobileOpen(false)}
-                      className="rounded-lg bg-blue-500 px-5 py-2 text-center text-white hover:bg-blue-600"
-                    >
-                      Log ind
-                    </Link>
-                    <Link
-                      href="/signup?next=/dashboard/onboarding"
-                      prefetch={false}
-                      onClick={() => setMobileOpen(false)}
-                      className="rounded-lg border border-blue-500 px-5 py-2 text-center text-blue-500 hover:bg-blue-50"
-                    >
-                      Bliv medarbejder
-                    </Link>
-                  </>
-                )}
+                      <button
+                        onClick={() => {
+                          setMobileOpen(false);
+                          logout();
+                        }}
+                        className="rounded-lg bg-blue-500 px-5 py-2 text-center text-white hover:bg-blue-600"
+                        type="button"
+                      >
+                        Log ud
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href="/login"
+                        prefetch={false}
+                        onClick={() => setMobileOpen(false)}
+                        className="rounded-lg bg-blue-500 px-5 py-2 text-center text-white hover:bg-blue-600"
+                      >
+                        Log ind
+                      </Link>
+                      <Link
+                        href="/signup?next=/dashboard/onboarding"
+                        prefetch={false}
+                        onClick={() => setMobileOpen(false)}
+                        className="rounded-lg border border-blue-500 px-5 py-2 text-center text-blue-500 hover:bg-blue-50"
+                      >
+                        Bliv medarbejder
+                      </Link>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          </motion.div>
+            </motion.nav>
+          </div>
         )}
       </AnimatePresence>
-    </nav>
+    </header>
   );
 }
