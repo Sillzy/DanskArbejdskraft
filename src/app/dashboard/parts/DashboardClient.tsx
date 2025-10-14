@@ -1,3 +1,4 @@
+// src/app/dashboard/parts/DashboardClient.tsx
 'use client';
 
 import * as React from 'react';
@@ -156,17 +157,11 @@ function RegisterTimeModal({
   const keyOpen = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
 
   return (
-    <div className="fixed inset-0 z-[80]">
-      {/* backdrop: close on pointer-down to avoid mobile delayed click */}
-      <div
-        className="absolute inset-0 bg-black/40"
-        onMouseDown={() => onClose()}
-        onTouchStart={() => onClose()}
-      />
+    <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true">
+      {/* IMPORTANT: Backdrop is NOT closable for this modal (prevents picker-induced closes on mobile) */}
+      <div className="absolute inset-0 bg-black/40" />
       <div
         className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8"
-        onMouseDown={(e) => e.stopPropagation()}
-        onTouchStart={(e) => e.stopPropagation()}
       >
         <h3 className="text-2xl font-semibold">Register time</h3>
         {err && <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-base text-red-700">{err}</div>}
