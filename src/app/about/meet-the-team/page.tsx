@@ -95,7 +95,7 @@ export default function MeetTheTeamPage() {
       .select(
         'user_id, first_name, last_name, team_title, email, phone_number, avatar_url, profile_status'
       )
-      .eq('profile_status', 'approved') // ← key change: rely on profile_status
+      .eq('profile_status', 'approved')
       .order('first_name', { ascending: true });
 
     if (error) {
@@ -117,14 +117,13 @@ export default function MeetTheTeamPage() {
       await loadWorkers();
       if (cancelled) return;
 
-      // Realtime: update list when profile becomes approved or is edited
+      // Realtime updates
       const channel = supabase
         .channel('meet_the_team_profiles')
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'profiles' },
           async (payload) => {
-            // Minimal filter: if status changed OR a relevant field changed, refresh
             const newRow: any = payload.new;
             const oldRow: any = payload.old;
 
@@ -179,9 +178,20 @@ export default function MeetTheTeamPage() {
     <main className="mx-auto max-w-6xl px-4 py-16">
       <h1 className="mb-10 text-4xl font-bold text-slate-900">Mød teamet</h1>
 
+      {/* Intro (before core team) */}
+      <section className="mb-10">
+        <p className="text-slate-700 leading-7">
+          Vi er et hold, der selv har stået i marken i mere end 10&nbsp;år. Undervejs
+          har vi samlet et stærkt netværk af dygtige folk, som vi arbejder tæt sammen med.
+          Vi er i vækst og udvider løbende vores kapacitet. I tidligere stillinger og projekter
+          har vi haft ansvar for over 80 medarbejdere ad gangen – erfaring, struktur og kvalitet
+          er derfor fundamentet for det, vi leverer i dag.
+        </p>
+      </section>
+
       {/* Core team */}
       <section className="mb-16">
-        <h2 className="mb-6 text-2xl font-semibold text-slate-900">Team</h2>
+        <h2 className="mb-6 text-2xl font-semibold text-slate-900">Kerneteam</h2>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {CORE_TEAM.map((m) => (
             <Card
@@ -209,7 +219,7 @@ export default function MeetTheTeamPage() {
               <Card
                 key={w.user_id}
                 name={formatName(w.first_name, w.last_name)}
-                title={w.team_title ?? 'Faglært'}
+                // No title for skilled workers (intentionally omitted)
                 email={w.email ?? undefined}
                 phone={w.phone_number ?? undefined}
                 avatar={w.avatar_url}
@@ -230,7 +240,7 @@ function Card({
   avatar,
 }: {
   name: string;
-  title: string;
+  title?: string; // made optional
   email?: string | null;
   phone?: string | null;
   avatar: string | null | undefined;
@@ -253,7 +263,7 @@ function Card({
         )}
       </div>
       <div className="font-semibold text-slate-900">{name}</div>
-      <div className="text-sm text-slate-600">{title}</div>
+      {title ? <div className="text-sm text-slate-600">{title}</div> : null}
 
       {email && (
         <div className="mt-2 text-sm">

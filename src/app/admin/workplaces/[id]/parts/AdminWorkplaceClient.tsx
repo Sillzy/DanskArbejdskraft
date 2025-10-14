@@ -74,6 +74,15 @@ function toHoursDecimal(mins: number) {
   return Math.round((mins / 60) * 100) / 100;
 }
 
+/* ---------------- Overtime split (per week total minutes) ------- */
+function splitOvertime(weekTotalMin: number) {
+  const regularCap = 37 * 60;   // 37h
+  const after3Cap  = 52 * 60;   // 37h + 15h → "after first 3h/day" weekly cap
+  const otFirst3   = Math.max(0, Math.min(weekTotalMin - regularCap, after3Cap - regularCap));
+  const otAfter3   = Math.max(0, weekTotalMin - after3Cap);
+  return { otFirst3, otAfter3 };
+}
+
 /* ---------------- Types ---------------- */
 type TimeRow = {
   user_id: string;
@@ -82,6 +91,7 @@ type TimeRow = {
   break_minutes: number | null;
 };
 type UserLite = { user_id: string; first_name: string | null; last_name: string | null };
+type Photo = { name: string; path: string; url: string };
 
 /* ---------------- Component ---------------- */
 export default function AdminWorkplaceClient({
@@ -98,38 +108,45 @@ export default function AdminWorkplaceClient({
   const [dayUsers, setDayUsers] = React.useState<{ day: string; list: Array<{ uid: string; name: string; mins: number }> } | null>(null);
 
   // photos
-  type Photo = { name: string; path: string; url: string };
   const [photos, setPhotos] = React.useState<Photo[]>([]);
   const [deleting, setDeleting] = React.useState<string | null>(null);
 
-  /* ------- Load time entries ------- */
+  /* ------- Load APPROVED users, then filter entries by those IDs ------- */
   React.useEffect(() => {
     (async () => {
+      // 1) Approved profiles (names + ids)
+      const { data: approved } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name')
+        .eq('profile_status', 'approved');
+
+      const map = new Map<string, UserLite>();
+      const approvedIds: string[] = [];
+      (approved ?? []).forEach((u) => {
+        map.set(u.user_id, { user_id: u.user_id, first_name: u.first_name, last_name: u.last_name });
+        approvedIds.push(u.user_id);
+      });
+      setUsersMap(map);
+
+      // No approved workers? then no rows.
+      if (approvedIds.length === 0) {
+        setRows([]);
+        return;
+      }
+
+      // 2) Time entries for THIS workplace by APPROVED users
       const since = new Date(2025, 8, 1); // 2025-09-01
-      const { data } = await supabase
+      const { data: entries } = await supabase
         .from('time_entries')
         .select('user_id, started_at, ended_at, break_minutes')
         .eq('workplace_id', workplaceId)
+        .in('user_id', approvedIds)
         .gte('started_at', since.toISOString())
         .order('started_at', { ascending: true });
-      if (data) setRows(data as TimeRow[]);
+
+      setRows((entries ?? []) as TimeRow[]);
     })();
   }, [workplaceId]);
-
-  /* ------- Load user names ------- */
-  React.useEffect(() => {
-    (async () => {
-      const uids = Array.from(new Set(rows.map(r => r.user_id)));
-      if (uids.length === 0) { setUsersMap(new Map()); return; }
-      const { data } = await supabase
-        .from('profiles')
-        .select('user_id, first_name, last_name')
-        .in('user_id', uids);
-      const map = new Map<string, UserLite>();
-      (data as UserLite[] | null)?.forEach(u => map.set(u.user_id, u));
-      setUsersMap(map);
-    })();
-  }, [rows]);
 
   /* ------- Month totals for calendar ------- */
   const recomputeMonth = React.useCallback(() => {
@@ -172,13 +189,13 @@ export default function AdminWorkplaceClient({
     setDayUsers({ day: key, list });
   }
 
-  /* ------- Weeks W36-2025 → now ------- */
+  /* ------- Weeks W36-2025 → now (with OT) ------- */
   const weekRows = React.useMemo(() => {
     const start = startOfISOWeek(new Date(2025, 8, 1));
     const end = startOfISOWeek(new Date());
     const lines: Array<{
       label: string; spanText: string; weekStart: Date;
-      totalMin: number; weekendMin: number;
+      totalMin: number; weekendMin: number; otFirst3: number; otAfter3: number;
     }> = [];
 
     for (let cur = new Date(start); cur <= end; cur = addDays(cur, 7)) {
@@ -195,10 +212,11 @@ export default function AdminWorkplaceClient({
         const dow = s.getDay();
         if (dow === 0 || dow === 6) weekend += mins;
       }
+      const { otFirst3, otAfter3 } = splitOvertime(total);
       const label = `${sIsoYear(weekStart)}W${String(getISOWeek(weekStart)).padStart(2, '0')}`;
       const spanText = `${weekStart.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} – ${addDays(weekStart, 6).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`;
 
-      lines.push({ label, spanText, weekStart, totalMin: total, weekendMin: weekend });
+      lines.push({ label, spanText, weekStart, totalMin: total, weekendMin: weekend, otFirst3, otAfter3 });
     }
     return lines.reverse();
   }, [rows]);
@@ -242,7 +260,7 @@ export default function AdminWorkplaceClient({
   const BORDER = rgb(0.65, 0.67, 0.7);     // light grid color
   const TEXT = rgb(0, 0, 0);
 
-  // Column layout (sum should fit pageWidth - 2*margin)
+  // Column layout
   const COLS = [
     { key: 'date',  label: 'Dato',        w: 92 },
     { key: 'day',   label: 'Dag',         w: 112 },
@@ -250,7 +268,7 @@ export default function AdminWorkplaceClient({
     { key: 'end',   label: 'Slut',        w: 70 },
     { key: 'break', label: 'Pause (min)', w: 92 },
     { key: 'hours', label: 'Timer',       w: 78 },
-    { key: 'notes', label: 'Noter',       w: 280 }, // fills the rest
+    { key: 'notes', label: 'Noter',       w: 280 },
   ] as const;
 
   function weekdayName(i: number) {
@@ -274,7 +292,6 @@ export default function AdminWorkplaceClient({
     siteNo?: string;
     address?: string;
   }) {
-    // Create a fresh landscape page
     const pdf = await PDFDocument.create();
     const page = pdf.addPage(A4_LANDSCAPE);
     const { width, height } = page.getSize();
@@ -291,14 +308,13 @@ export default function AdminWorkplaceClient({
     const left = MARGIN;
     const right = width - MARGIN;
 
-    // Names, week info
     const first = (opts.user.first_name ?? '').trim();
     const last = (opts.user.last_name ?? '').trim();
     const fullName = `${first} ${last}`.trim() || opts.user.user_id;
     const isoYear = sIsoYear(opts.weekStart);
     const isoW = String(getISOWeek(opts.weekStart)).padStart(2, '0');
 
-    // ===== Header (Danish; Calendar dates removed) =====
+    // Header (Danish)
     const titleY = height - MARGIN - 6;
     drawText('DANSK ARBEJDSKRAFT - UGENTLIG TIMESEDDEL', left, titleY, 16, true);
 
@@ -319,7 +335,7 @@ export default function AdminWorkplaceClient({
     drawText('Uge', left + colW + 16, hdrY - 32, 10, true);
     drawText(`${isoYear}W${isoW}`, left + colW + 16, hdrY - 46);
 
-    // ===== Table header =====
+    // Table header
     const tableTop = GRID_TOP;
     let xCursor = left;
     COLS.forEach(c => {
@@ -328,7 +344,7 @@ export default function AdminWorkplaceClient({
       xCursor += c.w;
     });
 
-    // Build day rows (Mon–Sun)
+    // Day rows
     const byDay = Array.from({ length: 7 }, (_, i) => {
       const dayStart = addDays(opts.weekStart, i);
       const key = ymd(dayStart);
@@ -373,7 +389,7 @@ export default function AdminWorkplaceClient({
 
       const cells = [
         row.date,
-        weekdayName(i),
+        ['Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag','Søndag'][i],
         row.start,
         row.end,
         row.breakMin ? String(row.breakMin) : '',
@@ -411,14 +427,12 @@ export default function AdminWorkplaceClient({
       xCursor += c.w;
     });
 
-    // Signature block moved further down (near bottom)
-    const sigY = MARGIN + 34; // lower than before
+    // Signature block
+    const sigY = MARGIN + 34;
     page.drawRectangle({ x: left, y: sigY, width: right - left, height: 64, borderColor: BORDER, borderWidth: 0.6 });
 
     drawText('Foremand Fulde navn:', left + 400, sigY + 90, 10, true);
-
     drawText(`${fullName} underskrift:`, left + 8, sigY + 40, 10, true);
-
     drawText('Foremand underskrift:', left + 400, sigY + 40, 10, true);
 
     const bytes = await pdf.save();
@@ -520,7 +534,7 @@ export default function AdminWorkplaceClient({
                           user,
                           weekStart: ws,
                           entries,
-                          company: '', // fill if you have it
+                          company: '',
                           siteNo: '',
                           address: '',
                         });
@@ -623,8 +637,14 @@ export default function AdminWorkplaceClient({
                   <div className="text-slate-500">Weekend</div>
                   <div className="font-semibold">{hhmm(w.weekendMin)}</div>
                 </div>
-                <div />
-                <div />
+                <div className="rounded-lg bg-blue-50 p-2 text-center">
+                  <div className="text-slate-600">OT First 3 Hours</div>
+                  <div className="font-semibold">{hhmm(w.otFirst3)}</div>
+                </div>
+                <div className="rounded-lg bg-indigo-50 p-2 text-center">
+                  <div className="text-slate-600">OT After 3 Hours</div>
+                  <div className="font-semibold">{hhmm(w.otAfter3)}</div>
+                </div>
               </div>
             </div>
           ))}
