@@ -1061,45 +1061,27 @@ export default function DashboardClient({
         <section className="lg:col-span-2 space-y-6">
           {/* Create workplace */}
           <div className="rounded-2xl border bg-white p-5">
-            <h2 className="text-lg font-semibold">Create new workplace</h2>
-            {err && (
-              <div className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-                {err}
-              </div>
-            )}
+            <h2 className="text-lg font-semibold">Add workplace</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Tap a box to add it to your dashboard. Only workplaces marked <em>Active</em> by Admin are shown.
+            </p>
 
-            <form
-              onSubmit={createWorkplace}
-              className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-3"
-            >
-              <input
-                className="rounded-lg border p-3"
-                placeholder="Project Name / Site Number / Address"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <input
-                className="rounded-lg border p-3"
-                placeholder="Company name (optional)"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-              />
-              <input
-                className="rounded-lg border p-3 lg:col-span-3"
-                placeholder="Full Address (optional)"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-              />
+            <AvailableWorkplacesGrid
+              already={new Set(wps.map((w) => w.id))}
+              onAdded={async (id) => {
+                // pull the just-added workplace so UI updates immediately
+                const { data } = await supabase
+                  .from('workplaces')
+                  .select('id,user_id,name,address,company_name,created_at,updated_at')
+                  .eq('id', id)
+                  .single();
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="lg:col-span-3 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-white text-lg font-semibold hover:bg-blue-700 disabled:opacity-60"
-              >
-                <Plus className="h-5 w-5" />
-                {saving ? 'Creating…' : 'Create workplace'}
-              </button>
-            </form>
+                if (data) {
+                  // put it at the top like “recently added”
+                  setWps((prev) => [data as any, ...prev.filter((p) => p.id !== id)]);
+                }
+              }}
+            />
           </div>
 
           {/* Recent workplace */}
