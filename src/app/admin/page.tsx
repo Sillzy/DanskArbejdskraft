@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { getServerSupabase } from '@/../lib/supabase-server';
 import EditWorkplaceFields from '@/../components/admin/EditWorkplaceFields';
 
@@ -50,6 +51,7 @@ function ActiveToggleClient({ id, value }: { id: string; value: boolean }) {
         const { data: isAdmin } = await supabase.rpc('is_admin', { p_uid: auth.user.id });
         if (!isAdmin) return;
         await supabase.from('workplaces').update({ is_active: !value }).eq('id', id);
+        revalidatePath('/admin');
       }}
     >
       <button
@@ -78,10 +80,11 @@ function CreateWorkplaceServerForm() {
     const supabase = await getServerSupabase();
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) return;
+
     const { data: isAdmin } = await supabase.rpc('is_admin', { p_uid: auth.user.id });
     if (!isAdmin) return;
 
-    // ONE required field (catch-all identifier)
+    // Required
     const name = String(formData.get('name') || '').trim();
     if (!name) return;
 
@@ -91,7 +94,9 @@ function CreateWorkplaceServerForm() {
     const company_cvr = String(formData.get('company_cvr') || '').trim() || null;
     const invoice_email = String(formData.get('invoice_email') || '').trim() || null;
 
-    await supabase.from('workplaces').insert({
+    // Insert with user_id (RLS-safe)
+    const { error } = await supabase.from('workplaces').insert({
+      user_id: auth.user.id,
       name,
       company_name,
       address,
@@ -99,27 +104,37 @@ function CreateWorkplaceServerForm() {
       invoice_email,
       is_active: true,
     });
+
+    if (!error) {
+      revalidatePath('/admin');
+      return;
+    }
+
+    // Fallback: hit the API route you added (does the same thing + sets user_id)
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/api/admin/workplace/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, company_name, address, company_cvr, invoice_email, is_active: true }),
+      });
+      revalidatePath('/admin');
+    } catch {
+      // swallow; page stays as-is if both attempts fail
+    }
   }
 
   return (
     <form action={create} className="mt-2 grid grid-cols-1 gap-3 lg:grid-cols-3">
-      {/* Required single identifier */}
       <input
         name="name"
         className="rounded-lg border p-3 lg:col-span-3"
         placeholder="Project Name / Site no. / Project no. or Address"
         required
       />
-      {/* Optionals */}
       <input name="company_name" className="rounded-lg border p-3" placeholder="Company name (optional)" />
       <input name="address" className="rounded-lg border p-3 lg:col-span-2" placeholder="Full address (optional)" />
       <input name="company_cvr" className="rounded-lg border p-3" placeholder="CVR (optional)" />
-      <input
-        name="invoice_email"
-        type="email"
-        className="rounded-lg border p-3 lg:col-span-2"
-        placeholder="Invoice email (optional)"
-      />
+      <input name="invoice_email" type="email" className="rounded-lg border p-3 lg:col-span-2" placeholder="Invoice email (optional)" />
       <button
         type="submit"
         className="lg:col-span-3 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-white text-lg font-semibold hover:bg-blue-700"
@@ -219,12 +234,10 @@ export default async function AdminPage() {
     const uid = e.user_id as string;
     const wid = (e.workplace_id as string) || null;
 
-    // Month totals (current month only)
     if (s >= monthStart && s < monthEnd) {
       perUserMonthMin[uid] = (perUserMonthMin[uid] || 0) + mins;
     }
 
-    // Which ISO week (by UTC date) within our 8-week window
     const dayUTC = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate()));
     let label = '';
     for (let i = 0; i < weekStartDates.length; i++) {
@@ -237,7 +250,6 @@ export default async function AdminPage() {
     }
     if (!label) continue;
 
-    // Per workplace
     if (wid) {
       perWpWeek[wid] ||= {};
       perWpWeek[wid][label] ||= { sum: 0, weekend: 0, ot1: 0, ot2: 0 };
@@ -246,14 +258,12 @@ export default async function AdminPage() {
       if (dow === 0 || dow === 6) perWpWeek[wid][label].weekend += mins;
     }
 
-    // Per user (for worker table)
     perUserWeek[uid] ||= {};
     perUserWeek[uid][label] ||= { sum: 0, weekend: 0, ot1: 0, ot2: 0 };
     perUserWeek[uid][label].sum += mins;
     const dowU = s.getUTCDay();
     if (dowU === 0 || dowU === 6) perUserWeek[uid][label].weekend += mins;
 
-    // Track workplaces per user (names)
     if (wid) {
       workplacesByUser[uid] ||= new Set<string>();
       const nm = wpNameById.get(wid);
@@ -261,7 +271,6 @@ export default async function AdminPage() {
     }
   }
 
-  // Compute OT splits (per week)
   for (const wid of Object.keys(perWpWeek)) {
     for (const lab of Object.keys(perWpWeek[wid])) {
       const t = perWpWeek[wid][lab];
@@ -279,7 +288,6 @@ export default async function AdminPage() {
     }
   }
 
-  // Active workplaces card
   const activeWorkplaceIds = new Set<string>();
   Object.keys(perWpWeek).forEach((wid) => activeWorkplaceIds.add(wid));
 
@@ -445,11 +453,9 @@ export default async function AdminPage() {
               const uid = w.user_id as string;
               const row = perUserWeek[uid] || {};
 
-              // Workplace names (unique) for that user during the 8-week window
               const wset = (workplacesByUser[uid] ?? new Set<string>());
               const workplaceJoined = Array.from(wset).join(',\n');
 
-              // Current month total
               const monthTotal = perUserMonthMin[uid] || 0;
 
               return (
