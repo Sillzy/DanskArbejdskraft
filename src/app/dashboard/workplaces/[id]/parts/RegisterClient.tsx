@@ -1,4 +1,4 @@
-//src/app/dashboard/workplaces/[id]/parts/RegisterClient.tsx
+// src/app/dashboard/workplaces/[id]/parts/RegisterClient.tsx
 'use client';
 
 import * as React from 'react';
@@ -96,14 +96,11 @@ function UploadPhotoModal({
       const uuid = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`).replace(/[^a-zA-Z0-9-]/g, '');
       const path = `${folderFor(workplaceId)}/${uuid}.${ext}`;
 
-      const { error: upErr } = await supabase
-        .storage
-        .from(BUCKET)
-        .upload(path, file, {
-          upsert: false,
-          contentType: file.type || 'image/jpeg',
-          cacheControl: '3600',
-        });
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
+        upsert: false,
+        contentType: file.type || 'image/jpeg',
+        cacheControl: '3600',
+      });
 
       if (upErr) throw upErr;
 
@@ -119,8 +116,17 @@ function UploadPhotoModal({
 
   return (
     <div className="fixed inset-0 z-[90]">
-      <div className="absolute inset-0 bg-black/40" onClick={() => onClose()} />
-      <div className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-lg bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8">
+      {/* backdrop: close on pointer down; avoids iOS ghost click closing modal when tapping inputs */}
+      <div
+        className="absolute inset-0 bg-black/40"
+        onMouseDown={() => onClose()}
+        onTouchStart={() => onClose()}
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-lg bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8"
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <h3 className="text-2xl font-semibold">Upload photo</h3>
 
         {err && (
@@ -149,12 +155,14 @@ function UploadPhotoModal({
 
         <div className="mt-7 flex gap-3">
           <button
+            type="button"
             className="flex-1 rounded-xl border px-5 py-3 text-base hover:bg-slate-50"
             onClick={() => onClose()}
           >
             Cancel
           </button>
           <button
+            type="button"
             className="flex-1 rounded-xl bg-blue-600 text-white px-5 py-3 text-base hover:bg-blue-700 disabled:opacity-60"
             disabled={saving}
             onClick={doUpload}
@@ -217,12 +225,29 @@ function RegisterTimeModal({
   const dateRef = React.useRef<HTMLInputElement>(null);
   const startRef = React.useRef<HTMLInputElement>(null);
   const endRef = React.useRef<HTMLInputElement>(null);
+
+  // Robust cross-browser opener that doesn't trigger backdrop clicks on mobile
   function openPicker(ref: React.RefObject<HTMLInputElement>) {
     const el = ref.current;
     if (!el) return;
-    // @ts-expect-error
-    if (typeof el.showPicker === 'function') el.showPicker();
-    el.focus();
+    try {
+      // @ts-ignore not in all dom libs
+      if (typeof el.showPicker === 'function') {
+        el.focus({ preventScroll: true });
+        // @ts-ignore
+        el.showPicker();
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
+    const wasReadOnly = el.readOnly;
+    el.readOnly = false;
+    el.focus({ preventScroll: true });
+    el.click();
+    setTimeout(() => {
+      try { el.readOnly = wasReadOnly; } catch {}
+    }, 0);
   }
 
   async function saveReplaceByLocalDay() {
@@ -258,10 +283,22 @@ function RegisterTimeModal({
 
   if (!open) return null;
 
+  const fieldWrap = 'rounded-2xl border p-4 sm:p-5 overflow-hidden cursor-pointer bg-white';
+  const fieldInput = 'w-full h-16 sm:h-20 rounded-xl border px-4 text-2xl text-center focus:outline-none focus:ring-2 focus:ring-blue-200 appearance-none [-webkit-appearance:none] [-moz-appearance:textfield] bg-white';
+  const keyOpen = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
+
   return (
     <div className="fixed inset-0 z-[80]">
-      <div className="absolute inset-0 bg-black/40" onClick={() => onClose()} />
-      <div className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8">
+      <div
+        className="absolute inset-0 bg-black/40"
+        onMouseDown={() => onClose()}
+        onTouchStart={() => onClose()}
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8"
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <h3 className="text-2xl font-semibold">
           {editEntry ? 'Change work time' : 'Register time'}
         </h3>
@@ -273,71 +310,97 @@ function RegisterTimeModal({
         )}
 
         <div className="mt-6 grid grid-cols-1 gap-5">
+          {/* Date */}
           <div
-            className="rounded-2xl border p-4 sm:p-5 cursor-pointer"
+            className={fieldWrap}
             onClick={() => openPicker(dateRef)}
+            onKeyDown={keyOpen(() => openPicker(dateRef))}
+            onTouchStart={() => openPicker(dateRef)}
+            role="button"
+            tabIndex={0}
+            aria-label="Choose date"
           >
             <label className="block text-slate-600 text-base mb-2">Date</label>
             <input
               ref={dateRef}
               type="date"
-              className="w-full rounded-xl border p-4 text-xl sm:text-2xl tracking-wide"
+              className={fieldInput}
               value={workDate}
               onChange={(e) => setWorkDate(e.target.value)}
+              readOnly
+              inputMode="none"
             />
           </div>
 
+          {/* Times */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div
-              className="rounded-2xl border p-4 sm:p-5 cursor-pointer"
+              className={fieldWrap}
               onClick={() => openPicker(startRef)}
+              onKeyDown={keyOpen(() => openPicker(startRef))}
+              onTouchStart={() => openPicker(startRef)}
+              role="button"
+              tabIndex={0}
+              aria-label="Choose start time"
             >
               <label className="block text-slate-600 text-base mb-2">Start time</label>
               <input
                 ref={startRef}
                 type="time"
-                className="w-full rounded-xl border p-4 text-2xl h-16 sm:h-20 text-center"
+                className={fieldInput}
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
+                readOnly
+                inputMode="none"
               />
               <p className="mt-2 text-xs text-slate-500">Tap anywhere on this box to open the time wheel</p>
             </div>
 
             <div
-              className="rounded-2xl border p-4 sm:p-5 cursor-pointer"
+              className={fieldWrap}
               onClick={() => openPicker(endRef)}
+              onKeyDown={keyOpen(() => openPicker(endRef))}
+              onTouchStart={() => openPicker(endRef)}
+              role="button"
+              tabIndex={0}
+              aria-label="Choose end time"
             >
               <label className="block text-slate-600 text-base mb-2">End time</label>
               <input
                 ref={endRef}
                 type="time"
-                className="w-full rounded-xl border p-4 text-2xl h-16 sm:h-20 text-center"
+                className={fieldInput}
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
+                readOnly
+                inputMode="none"
               />
               <p className="mt-2 text-xs text-slate-500">Tap anywhere on this box to open the time wheel</p>
             </div>
           </div>
 
-          <div className="rounded-2xl border p-4 sm:p-5">
+          {/* Break */}
+          <div className="rounded-2xl border p-4 sm:p-5 bg-white">
             <label className="block text-slate-600 text-base mb-2">Break (minutes)</label>
-            <select
-              className="w-full rounded-xl border p-4 text-xl h-16"
-              value={breakMin}
-              onChange={(e) => setBreakMin(parseInt(e.target.value, 10))}
-            >
-              {[0, 15, 30, 45, 60, 75, 90].map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                className={'w-full h-16 rounded-xl border p-4 text-xl pr-10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 appearance-none [-webkit-appearance:none]'}
+                value={breakMin}
+                onChange={(e) => setBreakMin(parseInt(e.target.value, 10))}
+              >
+                {[0, 15, 30, 45, 60, 75, 90].map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5.5 7l4.5 4.5L14.5 7z" /></svg>
+            </div>
           </div>
         </div>
 
         <div className="mt-7 flex gap-4">
-          <button className="flex-1 rounded-xl border px-5 py-4 text-lg hover:bg-slate-50" onClick={() => onClose()}>
+          <button type="button" className="flex-1 rounded-xl border px-5 py-4 text-lg hover:bg-slate-50" onClick={() => onClose()}>
             Cancel
           </button>
           <button
+            type="button"
             className="flex-1 rounded-xl bg-blue-600 text-white px-5 py-4 text-lg hover:bg-blue-700 disabled:opacity-60"
             disabled={saving}
             onClick={saveReplaceByLocalDay}
@@ -492,6 +555,7 @@ export default function RegisterClient({ userId, workplaceId, workplaceName }: P
 
         <div className="flex flex-col sm:flex-row gap-3">
           <button
+            type="button"
             onClick={() => {
               setEditEntry(null);
               setModalOpen(true);
@@ -504,6 +568,7 @@ export default function RegisterClient({ userId, workplaceId, workplaceName }: P
 
           {canUpload && (
             <button
+              type="button"
               onClick={() => setUploadOpen(true)}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-3 rounded-2xl border px-7 py-5 text-lg font-semibold hover:bg-slate-50"
             >
@@ -524,14 +589,13 @@ export default function RegisterClient({ userId, workplaceId, workplaceName }: P
             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
               {photos.map((p) => (
                 <div key={p.path} className="relative group overflow-hidden rounded-lg border">
-                  {/* Thumbnail: show the whole image (no crop) */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <a href={p.url} target="_blank" rel="noreferrer" title={p.name}>
                     <img src={p.url} alt={p.name} className="h-28 w-full object-contain bg-slate-100" />
                   </a>
 
-                  {/* Delete button */}
                   <button
+                    type="button"
                     onClick={() => deletePhoto(p.path)}
                     disabled={deleting === p.path}
                     title="Delete photo"
@@ -575,6 +639,7 @@ export default function RegisterClient({ userId, workplaceId, workplaceName }: P
                       </div>
                       <div className="flex gap-2">
                         <button
+                          type="button"
                           className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs hover:bg-slate-50"
                           onClick={() => {
                             const entry = entries.find((e) => e.id === r.id) || null;
@@ -587,6 +652,7 @@ export default function RegisterClient({ userId, workplaceId, workplaceName }: P
                           Change
                         </button>
                         <button
+                          type="button"
                           className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
                           onClick={() => deleteEntry(r.id)}
                           title="Delete"
