@@ -10,14 +10,9 @@ function fmtUTC(input: string | number | Date | null | undefined) {
   if (!input) return '—';
   const d = new Date(input);
   const opts: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZone: 'UTC',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, timeZone: 'UTC',
   };
   return new Intl.DateTimeFormat('en-GB', opts).format(d);
 }
@@ -26,7 +21,7 @@ function fmtUTC(input: string | number | Date | null | undefined) {
 type Workplace = {
   id: string;
   user_id: string;
-  name: string;
+  name: string;               // unified identifier: "Project Name / Site no. / Project no. or Address"
   address: string | null;
   company_name: string | null;
   created_at: string;
@@ -69,26 +64,8 @@ function Row({ label, value, icon }: { label: string; value: React.ReactNode; ic
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border bg-white p-4">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
-    </div>
-  );
-}
-
-function hhmm(mins: number) {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `${h}h ${m}m`;
-}
-function ymd(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+function hhmm(mins: number) { const h = Math.floor(mins / 60); const m = mins % 60; return `${h}h ${m}m`; }
+function ymd(d: Date) { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; }
 function startOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0); }
 function endOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999); }
 function startOfISOWeek(d: Date) { const tmp = new Date(d); const day = (tmp.getDay() + 6) % 7; tmp.setHours(0,0,0,0); tmp.setDate(tmp.getDate() - day); return tmp; }
@@ -129,17 +106,32 @@ function RegisterTimeModal({
   const [breakMin, setBreakMin] = React.useState(30);
   const [saving, setSaving] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
+
   const dateRef = React.useRef<HTMLInputElement>(null);
   const startRef = React.useRef<HTMLInputElement>(null);
   const endRef = React.useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => { if (open) { setWorkDate(today); setStart('07:00'); setEnd('16:00'); setBreakMin(30); setErr(null); } }, [open, today]);
+  React.useEffect(() => {
+    if (open) { setWorkDate(today); setStart('07:00'); setEnd('16:00'); setBreakMin(30); setErr(null); }
+  }, [open, today]);
 
+  // Robustly open native pickers across Chrome, Safari iOS, Android WebViews
   function openPicker(ref: React.RefObject<HTMLInputElement>) {
     const el = ref.current; if (!el) return;
-    // @ts-expect-error
-    if (typeof el.showPicker === 'function') el.showPicker();
-    el.focus();
+    try {
+      // @ts-ignore - not in all TS dom libs
+      if (typeof el.showPicker === 'function') {
+        el.focus({ preventScroll: true });
+        // @ts-ignore
+        el.showPicker();
+        return;
+      }
+    } catch { /* fall through */ }
+    const wasReadOnly = el.readOnly;
+    el.readOnly = false;
+    el.focus({ preventScroll: true });
+    el.click();
+    setTimeout(() => { try { el.readOnly = wasReadOnly; } catch {} }, 0);
   }
 
   async function submit() {
@@ -169,6 +161,8 @@ function RegisterTimeModal({
   const fieldWrap = 'rounded-2xl border p-4 sm:p-5 overflow-hidden cursor-pointer bg-white';
   const fieldInput = 'w-full h-16 sm:h-20 rounded-xl border px-4 text-2xl text-center focus:outline-none focus:ring-2 focus:ring-blue-200 appearance-none [-webkit-appearance:none] [-moz-appearance:textfield] bg-white';
 
+  const keyOpen = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
+
   return (
     <div className="fixed inset-0 z-[80]">
       <div className="absolute inset-0 bg-black/40" onClick={() => onClose()} />
@@ -176,22 +170,73 @@ function RegisterTimeModal({
         <h3 className="text-2xl font-semibold">Register time</h3>
         {err && <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-base text-red-700">{err}</div>}
         <div className="mt-6 grid grid-cols-1 gap-5">
-          <div className={fieldWrap} onClick={() => openPicker(dateRef)}>
+          {/* Date */}
+          <div
+            className={fieldWrap}
+            onClick={() => openPicker(dateRef)}
+            onKeyDown={keyOpen(() => openPicker(dateRef))}
+            onTouchStart={() => openPicker(dateRef)}
+            role="button"
+            tabIndex={0}
+            aria-label="Choose date"
+          >
             <label className="block text-slate-600 text-base mb-2">Date</label>
-            <input ref={dateRef} type="date" className={fieldInput} value={workDate} onChange={(e) => setWorkDate(e.target.value)} readOnly />
+            <input
+              ref={dateRef}
+              type="date"
+              className={fieldInput}
+              value={workDate}
+              onChange={(e) => setWorkDate(e.target.value)}
+              readOnly
+              inputMode="none"
+            />
           </div>
+          {/* Times */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div className={fieldWrap} onClick={() => openPicker(startRef)}>
+            <div
+              className={fieldWrap}
+              onClick={() => openPicker(startRef)}
+              onKeyDown={keyOpen(() => openPicker(startRef))}
+              onTouchStart={() => openPicker(startRef)}
+              role="button"
+              tabIndex={0}
+              aria-label="Choose start time"
+            >
               <label className="block text-slate-600 text-base mb-2">Start time</label>
-              <input ref={startRef} type="time" className={fieldInput} value={start} onChange={(e) => setStart(e.target.value)} readOnly />
+              <input
+                ref={startRef}
+                type="time"
+                className={fieldInput}
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                readOnly
+                inputMode="none"
+              />
               <p className="mt-2 text-xs text-slate-500">Tap anywhere on this box to open the time wheel</p>
             </div>
-            <div className={fieldWrap} onClick={() => openPicker(endRef)}>
+            <div
+              className={fieldWrap}
+              onClick={() => openPicker(endRef)}
+              onKeyDown={keyOpen(() => openPicker(endRef))}
+              onTouchStart={() => openPicker(endRef)}
+              role="button"
+              tabIndex={0}
+              aria-label="Choose end time"
+            >
               <label className="block text-slate-600 text-base mb-2">End time</label>
-              <input ref={endRef} type="time" className={fieldInput} value={end} onChange={(e) => setEnd(e.target.value)} readOnly />
+              <input
+                ref={endRef}
+                type="time"
+                className={fieldInput}
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                readOnly
+                inputMode="none"
+              />
               <p className="mt-2 text-xs text-slate-500">Tap anywhere on this box to open the time wheel</p>
             </div>
           </div>
+          {/* Break select */}
           <div className="rounded-2xl border p-4 sm:p-5 bg-white">
             <label className="block text-slate-600 text-base mb-2">Break (minutes)</label>
             <div className="relative">
@@ -270,8 +315,8 @@ function UploadPhotoModal({
 
 /* ------------------------------ Overtime calculations ------------------------------ */
 function splitOvertime(weekTotalMin: number) {
-  const regularCap = 37 * 60; // 2220
-  const after3Cap = 52 * 60;  // 3120
+  const regularCap = 37 * 60;
+  const after3Cap = 52 * 60;
   const regular = Math.min(weekTotalMin, regularCap);
   const remainder = Math.max(0, weekTotalMin - regularCap);
   const otFirst3 = Math.min(remainder, after3Cap - regularCap);
@@ -280,10 +325,11 @@ function splitOvertime(weekTotalMin: number) {
 }
 
 /* ------------------------ Available workplaces (active) picker ----------------------- */
+/* NOTE: site_number/project_number removed → just show the unified name */
 function AvailableWorkplacesGrid({
   disabled, already, onAdded,
 }: { disabled?: boolean; already: Set<string>; onAdded: (id: string) => void; }) {
-  const [rows, setRows] = React.useState<Array<{ id: string; name: string; site_number: string | null; project_number: string | null; }>>([]);
+  const [rows, setRows] = React.useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState<string | null>(null);
   const [adding, setAdding] = React.useState<string | null>(null);
@@ -292,7 +338,7 @@ function AvailableWorkplacesGrid({
     setLoading(true); setErr(null);
     const { data, error } = await supabase
       .from('workplaces')
-      .select('id,name,site_number,project_number,is_active')
+      .select('id,name,is_active')
       .eq('is_active', true)
       .order('name', { ascending: true });
     setLoading(false);
@@ -313,7 +359,7 @@ function AvailableWorkplacesGrid({
     });
     setAdding(null);
     if (!res.ok) {
-      if (res.status === 409) { alert('Workplace Already added'); return; }
+      if (res.status === 409) { alert('Workplace already added'); return; }
       const j = await res.json().catch(() => ({} as any));
       alert(j?.error || 'Failed to add workplace.');
       return;
@@ -328,25 +374,22 @@ function AvailableWorkplacesGrid({
 
   return (
     <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {rows.map((r) => {
-        const label = [r.name, r.site_number, r.project_number].filter(Boolean).join(' / ');
-        return (
-          <li key={r.id}>
-            <button
-              type="button"
-              disabled={disabled || adding === r.id}
-              onClick={() => add(r.id)}
-              className="w-full rounded-xl bg-blue-600 text-white px-6 py-4 text-lg font-bold hover:bg-blue-700 disabled:opacity-60"
-              title="Add workplace"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                ADD • {label}
-              </span>
-            </button>
-          </li>
-        );
-      })}
+      {rows.map((r) => (
+        <li key={r.id}>
+          <button
+            type="button"
+            disabled={disabled || adding === r.id}
+            onClick={() => add(r.id)}
+            className="w-full rounded-xl bg-blue-600 text-white px-6 py-4 text-lg font-bold hover:bg-blue-700 disabled:opacity-60"
+            title="Add workplace"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              ADD • {r.name}
+            </span>
+          </button>
+        </li>
+      ))}
     </ul>
   );
 }
@@ -386,7 +429,6 @@ export default function DashboardClient({
   // modal state
   const [regOpen, setRegOpen] = React.useState(false);
   const [regWpId, setRegWpId] = React.useState<string | null>(null);
-  // upload modal state
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [uploadWpId, setUploadWpId] = React.useState<string | null>(null);
 
@@ -492,15 +534,11 @@ export default function DashboardClient({
     return rows;
   }, [perDay]);
 
-  const monthStart = startOfMonth(new Date());
-  const monthEnd = endOfMonth(new Date());
-  const daysInMonth = rangeDays(monthStart, monthEnd);
-
   function openRegister(wpId: string) { setRegWpId(wpId); setRegOpen(true); }
   function closeRegister(refresh?: boolean) { setRegOpen(false); setRegWpId(null); if (refresh) { loadRecent(); } }
   function openUpload(wpId: string) { setUploadWpId(wpId); setUploadOpen(true); }
 
-  // === MISSING EARLIER: unlink workplace for THIS user only ===
+  // Unlink workplace for THIS user only
   async function deleteWorkplace(workplaceId: string, _createdAt: string) {
     try {
       const res = await fetch(`/api/user-workplaces?workplace_id=${encodeURIComponent(workplaceId)}`, { method: 'DELETE' });
@@ -514,9 +552,6 @@ export default function DashboardClient({
       alert('Failed to remove workplace from your dashboard.');
     }
   }
-
-  const newest = wps[0];
-  const totalMin = monthEntries.reduce((sum, e) => sum + (e?.minutes ?? 0), 0);
 
   return (
     <>
@@ -554,7 +589,7 @@ export default function DashboardClient({
               <div className="text-sm text-slate-600">Week {getISOWeek(new Date())}</div>
               <div className="mt-1 text-3xl font-bold">{loadingStats ? '—' : hhmm(thisWeekMin)}</div>
             </div>
-            <div className="mt-3 text-sm text-slate-800">This month: <span className="font-semibold">{Math.floor(totalMinMonthProp / 60)}h {totalMinMonthProp % 60}m</span></div>
+
             <div className="mt-5">
               <div className="text-sm font-semibold mb-2">Weekly totals (5 weeks)</div>
               <div className="space-y-2">
@@ -575,18 +610,17 @@ export default function DashboardClient({
               </div>
             </div>
 
+            {/* Navigable month calendar (per-day totals) */}
             <div className="mt-6">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-sm font-semibold">
                   {calMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
-                  {loadingCal ? <span className="ml-2 text-slate-500">· loading…</span> : null}
                 </div>
                 <div className="flex gap-2">
-                  <button type="button" onClick={prevMonth} disabled={calMonth <= MIN_CAL_MONTH} className="rounded-md border px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50" title="Previous month">←</button>
-                  <button type="button" onClick={nextMonth} disabled={calMonth >= NOW_MONTH} className="rounded-md border px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50" title="Next month">→</button>
+                  <button type="button" onClick={() => { const min = new Date(2025, 8, 1); if (calMonth <= min) return; setCalMonth(startOfMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1))); }} className="rounded-md border px-2 py-1 text-sm hover:bg-slate-50">←</button>
+                  <button type="button" onClick={() => { const nowM = startOfMonth(new Date()); if (calMonth >= nowM) return; setCalMonth(startOfMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1))); }} className="rounded-md border px-2 py-1 text-sm hover:bg-slate-50">→</button>
                 </div>
               </div>
-
               {(() => {
                 const calStart = startOfMonth(calMonth);
                 const calEnd = endOfMonth(calMonth);
@@ -610,7 +644,7 @@ export default function DashboardClient({
           </section>
         </div>
 
-        {/* RIGHT: Create + Recent + All */}
+        {/* RIGHT: Add workplace + Recent + All */}
         <section className="lg:col-span-2 space-y-6">
           {/* Add workplace (only for approved) */}
           {profileStatus === 'approved' ? (
@@ -667,7 +701,7 @@ export default function DashboardClient({
           <div className="rounded-2xl border bg-white p-5">
             <h3 className="text-base font-semibold">All workplaces</h3>
             {wps.length === 0 ? (
-              <div className="mt-3 text-sm text-slate-500">Nothing here yet. Create your first workplace above.</div>
+              <div className="mt-3 text-sm text-slate-500">Nothing here yet. Add one above.</div>
             ) : (
               <ul className="mt-4 space-y-4">
                 {wps.map((wp) => {

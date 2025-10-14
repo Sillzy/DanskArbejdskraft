@@ -28,7 +28,7 @@ function getISOWeekNumber(d: Date) {
   return weekNo;
 }
 
-/* ---------- OT helpers ---------- */
+/* ---------- Overtime split (per week) ---------- */
 function splitOvertime(minWeek: number) {
   const min37h = 37 * 60;
   const min52h = 52 * 60;
@@ -38,7 +38,7 @@ function splitOvertime(minWeek: number) {
 }
 const h1 = (mins: number) => (mins / 60).toFixed(1);
 
-/* ---------- Client-ish helpers (server actions inside forms) ---------- */
+/* ---------- Small client helpers embedded (toggle + creator) ---------- */
 function ActiveToggleClient({ id, value }: { id: string; value: boolean }) {
   return (
     <form
@@ -81,13 +81,15 @@ function CreateWorkplaceServerForm() {
     const { data: isAdmin } = await supabase.rpc('is_admin', { p_uid: auth.user.id });
     if (!isAdmin) return;
 
+    // ONE required field (catch-all identifier)
     const name = String(formData.get('name') || '').trim();
+    if (!name) return;
+
+    // Optionals
     const company_name = String(formData.get('company_name') || '').trim() || null;
     const address = String(formData.get('address') || '').trim() || null;
     const company_cvr = String(formData.get('company_cvr') || '').trim() || null;
     const invoice_email = String(formData.get('invoice_email') || '').trim() || null;
-
-    if (!name) return;
 
     await supabase.from('workplaces').insert({
       name,
@@ -97,23 +99,31 @@ function CreateWorkplaceServerForm() {
       invoice_email,
       is_active: true,
     });
-
-    redirect('/admin'); // show the new row immediately
   }
 
   return (
     <form action={create} className="mt-2 grid grid-cols-1 gap-3 lg:grid-cols-3">
+      {/* Required single identifier */}
       <input
         name="name"
         className="rounded-lg border p-3 lg:col-span-3"
         placeholder="Project Name / Site no. / Project no. or Address"
         required
       />
+      {/* Optionals */}
       <input name="company_name" className="rounded-lg border p-3" placeholder="Company name (optional)" />
       <input name="address" className="rounded-lg border p-3 lg:col-span-2" placeholder="Full address (optional)" />
       <input name="company_cvr" className="rounded-lg border p-3" placeholder="CVR (optional)" />
-      <input name="invoice_email" type="email" className="rounded-lg border p-3 lg:col-span-2" placeholder="Invoice email (optional)" />
-      <button type="submit" className="lg:col-span-3 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-white text-lg font-semibold hover:bg-blue-700">
+      <input
+        name="invoice_email"
+        type="email"
+        className="rounded-lg border p-3 lg:col-span-2"
+        placeholder="Invoice email (optional)"
+      />
+      <button
+        type="submit"
+        className="lg:col-span-3 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-white text-lg font-semibold hover:bg-blue-700"
+      >
         Create workplace
       </button>
     </form>
@@ -137,12 +147,13 @@ export default async function AdminPage() {
     );
   }
 
-  // Cards
+  // Cards: pending count
   const { count: pendingCount } = await supabase
     .from('profiles')
     .select('user_id', { count: 'exact', head: true })
     .eq('profile_status', 'under_review');
 
+  // Approved workers
   const { data: workers = [] } = await supabase
     .from('profiles')
     .select('user_id, first_name, last_name, email, phone, bank_reg_no, bank_account_no, swift, iban, profile_status')
@@ -152,7 +163,7 @@ export default async function AdminPage() {
   const approvedIds = (workers as any[]).map((w) => w.user_id as string);
   const hasWorkers = approvedIds.length > 0;
 
-  // Workplaces (site/project columns removed)
+  // All workplaces (business fields)
   const { data: workplaces = [] } = await supabase
     .from('workplaces')
     .select('id, name, company_name, company_cvr, invoice_email, is_active')
@@ -161,16 +172,18 @@ export default async function AdminPage() {
   const wpNameById = new Map<string, string>();
   (workplaces as any[]).forEach((w) => wpNameById.set(w.id, w.name));
 
-  // Time window (past 8 weeks)
+  // Time windows
   const mondayThisWeek = startOfISOWeek(new Date());
   const monday7wAgo = addDaysUTC(mondayThisWeek, -7 * 7);
   const rangeStart = monday7wAgo;
   const rangeEnd = addDaysUTC(mondayThisWeek, 7); // exclusive
 
+  // Current month window (UTC)
   const now = new Date();
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)); // exclusive
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0)); // exclusive
 
+  // Build week labels (oldest → newest)
   const weeks: string[] = [];
   const weekStartDates: Date[] = [];
   for (let i = 7; i >= 0; i--) {
@@ -179,6 +192,7 @@ export default async function AdminPage() {
     weekStartDates.push(monday);
   }
 
+  // Raw entries in 8-week window (approved users only)
   const { data: raw = [] } = hasWorkers
     ? await supabase
         .from('time_entries')
@@ -188,7 +202,9 @@ export default async function AdminPage() {
         .lt('started_at', formatISO(rangeEnd))
     : { data: [] as any[] };
 
+  // Aggregations
   type WTotals = { sum: number; weekend: number; ot1: number; ot2: number };
+
   const perWpWeek: Record<string, Record<string, WTotals>> = {};
   const perUserWeek: Record<string, Record<string, WTotals>> = {};
   const workplacesByUser: Record<string, Set<string>> = {};
@@ -203,8 +219,12 @@ export default async function AdminPage() {
     const uid = e.user_id as string;
     const wid = (e.workplace_id as string) || null;
 
-    if (s >= monthStart && s < monthEnd) perUserMonthMin[uid] = (perUserMonthMin[uid] || 0) + mins;
+    // Month totals (current month only)
+    if (s >= monthStart && s < monthEnd) {
+      perUserMonthMin[uid] = (perUserMonthMin[uid] || 0) + mins;
+    }
 
+    // Which ISO week (by UTC date) within our 8-week window
     const dayUTC = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate()));
     let label = '';
     for (let i = 0; i < weekStartDates.length; i++) {
@@ -217,6 +237,7 @@ export default async function AdminPage() {
     }
     if (!label) continue;
 
+    // Per workplace
     if (wid) {
       perWpWeek[wid] ||= {};
       perWpWeek[wid][label] ||= { sum: 0, weekend: 0, ot1: 0, ot2: 0 };
@@ -225,12 +246,14 @@ export default async function AdminPage() {
       if (dow === 0 || dow === 6) perWpWeek[wid][label].weekend += mins;
     }
 
+    // Per user (for worker table)
     perUserWeek[uid] ||= {};
     perUserWeek[uid][label] ||= { sum: 0, weekend: 0, ot1: 0, ot2: 0 };
     perUserWeek[uid][label].sum += mins;
     const dowU = s.getUTCDay();
     if (dowU === 0 || dowU === 6) perUserWeek[uid][label].weekend += mins;
 
+    // Track workplaces per user (names)
     if (wid) {
       workplacesByUser[uid] ||= new Set<string>();
       const nm = wpNameById.get(wid);
@@ -238,6 +261,7 @@ export default async function AdminPage() {
     }
   }
 
+  // Compute OT splits (per week)
   for (const wid of Object.keys(perWpWeek)) {
     for (const lab of Object.keys(perWpWeek[wid])) {
       const t = perWpWeek[wid][lab];
@@ -255,6 +279,7 @@ export default async function AdminPage() {
     }
   }
 
+  // Active workplaces card
   const activeWorkplaceIds = new Set<string>();
   Object.keys(perWpWeek).forEach((wid) => activeWorkplaceIds.add(wid));
 
@@ -298,21 +323,23 @@ export default async function AdminPage() {
         </Link>
       </div>
 
-      {/* Workplaces */}
+      {/* ======================= Workplaces FIRST ======================= */}
       <section className="rounded-2xl border bg-white p-5 overflow-x-auto">
         <h2 className="text-lg font-semibold mb-3">Workplaces</h2>
 
+        {/* New creator (admin only) */}
         <div className="rounded-xl border bg-slate-50 p-4">
           <div className="font-medium">Create new workplace</div>
           <CreateWorkplaceServerForm />
         </div>
 
         <div className="mt-6 mb-3 text-s text-slate-600">
-          Each week cell shows: <span className="font-medium">Total</span> • <span className="font-medium">Weekend</span> •{' '}
+          Each week cell shows:{' '}
+          <span className="font-medium">Total</span> • <span className="font-medium">Weekend</span> •{' '}
           <span className="font-medium">Overtime First 3H</span> • <span className="font-medium">Overtime After 3H</span>
         </div>
 
-        <table className="min-w-[980px] w-full text-sm">
+        <table className="min-w-[1180px] w-full text-sm">
           <thead>
             <tr className="text-left text-slate-600">
               <th className="py-2 pr-3">Active</th>
@@ -321,7 +348,9 @@ export default async function AdminPage() {
               <th className="py-2 pr-3">CVR</th>
               <th className="py-2 pr-3">Invoice email</th>
               {weeks.map((w) => (
-                <th key={w} className="py-2 px-2 text-center">{w}</th>
+                <th key={w} className="py-2 px-2 text-center">
+                  {w}
+                </th>
               ))}
               <th className="py-2 px-2 text-center">Action</th>
             </tr>
@@ -333,11 +362,10 @@ export default async function AdminPage() {
               return (
                 <tr key={wid} className="border-t align-top">
                   <td className="py-2 pr-3">
-                    {/* Active toggle */}
                     <ActiveToggleClient id={wid} value={(wp as any).is_active ?? true} />
                   </td>
 
-                  {/* Editable fields (site/project removed) */}
+                  {/* Editable fields */}
                   <td className="py-2 pr-3 font-medium">
                     <EditWorkplaceFields id={wid} field="name" value={wp.name ?? ''} placeholder="Workplace name" />
                   </td>
@@ -390,7 +418,7 @@ export default async function AdminPage() {
         </table>
       </section>
 
-      {/* Workers summary (unchanged aside from column removal dependencies) */}
+      {/* ======================= Workers summary (after Workplaces) ======================= */}
       <section className="rounded-2xl border bg-white p-5 overflow-x-auto">
         <h2 className="text-lg font-semibold mb-3">Hours by worker</h2>
         <div className="mb-3 text-s text-slate-600">
@@ -398,7 +426,76 @@ export default async function AdminPage() {
           <span className="font-medium">Overtime First 3H</span> • <span className="font-medium">Overtime After 3H</span>
         </div>
 
-        {/* (existing worker table – unchanged) */}
+        <table className="min-w-[980px] w-full text-sm">
+          <thead>
+            <tr className="text-left text-slate-600">
+              <th className="py-2 pr-3">Name</th>
+              <th className="py-2 pr-3">Workplace</th>
+              {weeks.map((w) => (
+                <th key={w} className="py-2 px-2 text-center">
+                  {w}
+                </th>
+              ))}
+              <th className="py-2 px-2 text-center">This Month Total</th>
+              <th className="py-2 px-2 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(workers as any[]).map((w) => {
+              const uid = w.user_id as string;
+              const row = perUserWeek[uid] || {};
+
+              // Workplace names (unique) for that user during the 8-week window
+              const wset = (workplacesByUser[uid] ?? new Set<string>());
+              const workplaceJoined = Array.from(wset).join(',\n');
+
+              // Current month total
+              const monthTotal = perUserMonthMin[uid] || 0;
+
+              return (
+                <tr key={uid} className="border-t align-top">
+                  <td className="py-2 pr-3 font-medium whitespace-pre-wrap">
+                    {(w.first_name ?? '—') + ' ' + (w.last_name ?? '')}
+                  </td>
+                  <td className="py-2 pr-3 whitespace-pre-line">{workplaceJoined || '—'}</td>
+
+                  {weeks.map((lab) => {
+                    const cell = row[lab];
+                    if (!cell) {
+                      return (
+                        <td key={lab} className="py-2 px-2 text-center text-slate-400">
+                          0 • 0 • 0 • 0
+                        </td>
+                      );
+                    }
+                    return (
+                      <td key={lab} className="py-2 px-2 text-center">
+                        <div className="inline-grid grid-cols-4 gap-1 text-[14px] leading-tight">
+                          <span className="font-medium">{h1(cell.sum)}</span>
+                          <span className="text-slate-600">{h1(cell.weekend)}</span>
+                          <span className="text-slate-600">{h1(cell.ot1)}</span>
+                          <span className="text-slate-600">{h1(cell.ot2)}</span>
+                        </div>
+                      </td>
+                    );
+                  })}
+
+                  <td className="py-2 px-2 text-center font-semibold">{h1(monthTotal)}</td>
+
+                  <td className="py-2 px-2 text-center">
+                    <Link
+                      href={`/admin/users/${uid}`}
+                      prefetch={false}
+                      className="inline-flex items-center rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50"
+                    >
+                      Open worker
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </section>
     </div>
   );
