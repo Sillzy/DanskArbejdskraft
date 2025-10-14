@@ -157,8 +157,17 @@ function RegisterTimeModal({
 
   return (
     <div className="fixed inset-0 z-[80]">
-      <div className="absolute inset-0 bg-black/40" onClick={() => onClose()} />
-      <div className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8">
+      {/* backdrop: close on pointer-down to avoid mobile delayed click */}
+      <div
+        className="absolute inset-0 bg-black/40"
+        onMouseDown={() => onClose()}
+        onTouchStart={() => onClose()}
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8"
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <h3 className="text-2xl font-semibold">Register time</h3>
         {err && <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-base text-red-700">{err}</div>}
         <div className="mt-6 grid grid-cols-1 gap-5">
@@ -243,8 +252,8 @@ function RegisterTimeModal({
           </div>
         </div>
         <div className="mt-7 flex gap-4">
-          <button className="flex-1 rounded-xl border px-5 py-4 text-lg hover:bg-slate-50" onClick={() => onClose()}>Cancel</button>
-          <button className="flex-1 rounded-xl bg-blue-600 text-white px-5 py-4 text-lg hover:bg-blue-700 disabled:opacity-60" disabled={saving} onClick={submit}>
+          <button type="button" className="flex-1 rounded-xl border px-5 py-4 text-lg hover:bg-slate-50" onClick={() => onClose()}>Cancel</button>
+          <button type="button" className="flex-1 rounded-xl bg-blue-600 text-white px-5 py-4 text-lg hover:bg-blue-700 disabled:opacity-60" disabled={saving} onClick={submit}>
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
@@ -303,8 +312,16 @@ function DeleteHoursModal({
 
   return (
     <div className="fixed inset-0 z-[85]">
-      <div className="absolute inset-0 bg-black/40" onClick={() => onClose()} />
-      <div className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8">
+      <div
+        className="absolute inset-0 bg-black/40"
+        onMouseDown={() => onClose()}
+        onTouchStart={() => onClose()}
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8"
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <h3 className="text-2xl font-semibold">Delete hours</h3>
         <p className="mt-2 text-sm text-slate-600">Your registered worklogs for this workplace (last 90 days).</p>
         {err && <div className="mt-3 rounded-md bg-red-50 px-4 py-3 text-red-700">{err}</div>}
@@ -328,6 +345,7 @@ function DeleteHoursModal({
                     <div className="text-slate-600">{start}–{end} • {hhmm(mins)}</div>
                   </div>
                   <button
+                    type="button"
                     onClick={() => del(r.id)}
                     disabled={deleting === r.id}
                     className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
@@ -343,7 +361,7 @@ function DeleteHoursModal({
         )}
 
         <div className="mt-6 flex justify-end">
-          <button className="rounded-xl border px-5 py-3 text-base hover:bg-slate-50" onClick={() => onClose(rows.length > 0)}>
+          <button type="button" className="rounded-xl border px-5 py-3 text-base hover:bg-slate-50" onClick={() => onClose(rows.length > 0)}>
             Close
           </button>
         </div>
@@ -384,8 +402,16 @@ function UploadPhotoModal({
 
   return (
     <div className="fixed inset-0 z-[90]">
-      <div className="absolute inset-0 bg-black/40" onClick={() => onClose()} />
-      <div className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8">
+      <div
+        className="absolute inset-0 bg-black/40"
+        onMouseDown={() => onClose()}
+        onTouchStart={() => onClose()}
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8"
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <h3 className="text-2xl font-semibold">Upload photo</h3>
         {err && <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-base text-red-700">{err}</div>}
         <div className="mt-5">
@@ -395,8 +421,8 @@ function UploadPhotoModal({
           </button>
         </div>
         <div className="mt-7 flex gap-3">
-          <button className="flex-1 rounded-xl border px-5 py-3 text-base hover:bg-slate-50" onClick={() => onClose()} disabled={uploading}>Cancel</button>
-          <button className="flex-1 rounded-xl bg-blue-600 text-white px-5 py-3 text-base hover:bg-blue-700 disabled:opacity-60" onClick={doUpload} disabled={uploading}>{uploading ? 'Uploading…' : 'Upload'}</button>
+          <button type="button" className="flex-1 rounded-xl border px-5 py-3 text-base hover:bg-slate-50" onClick={() => onClose()} disabled={uploading}>Cancel</button>
+          <button type="button" className="flex-1 rounded-xl bg-blue-600 text-white px-5 py-3 text-base hover:bg-blue-700 disabled:opacity-60" onClick={doUpload} disabled={uploading}>{uploading ? 'Uploading…' : 'Upload'}</button>
         </div>
       </div>
     </div>
@@ -809,13 +835,13 @@ export default function DashboardClient({
                         <div className="mt-2 text-xs text-slate-500">Created: {fmtUTC(wp.created_at)} • Updated: {fmtUTC(wp.updated_at)}</div>
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
-                        <button onClick={() => openRegister(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-white text-lg font-bold hover:bg-blue-700"><Clock className="h-5 w-5" />REGISTER TIME</button>
-                        <button onClick={() => openDeleteHours(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-4 text-white text-lg font-bold hover:bg-red-700"><Trash2 className="h-5 w-5" />DELETE HOURS</button>
+                        <button type="button" onClick={() => openRegister(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-white text-lg font-bold hover:bg-blue-700"><Clock className="h-5 w-5" />REGISTER TIME</button>
+                        <button type="button" onClick={() => openDeleteHours(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-4 text-white text-lg font-bold hover:bg-red-700"><Trash2 className="h-5 w-5" />DELETE HOURS</button>
                         {profileStatus === 'approved' && (
-                          <button onClick={() => openUpload(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-4 text-lg font-semibold hover:bg-slate-50"><ImageUp className="h-5 w-5" />Upload Photo</button>
+                          <button type="button" onClick={() => openUpload(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-4 text-lg font-semibold hover:bg-slate-50"><ImageUp className="h-5 w-5" />Upload Photo</button>
                         )}
                         {canDelete && (
-                          <button onClick={() => deleteWorkplace(wp.id, wp.created_at)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-3 text-base text-red-600 hover:bg-red-50">
+                          <button type="button" onClick={() => deleteWorkplace(wp.id, wp.created_at)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-3 text-base text-red-600 hover:bg-red-50">
                             <Trash2 className="h-5 w-5" /> Remove from my list
                           </button>
                         )}
