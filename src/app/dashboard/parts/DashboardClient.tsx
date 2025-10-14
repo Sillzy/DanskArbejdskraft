@@ -1,10 +1,9 @@
-//src/app/dashboard/parts/DashboardClient.tsx
 'use client';
 
 import * as React from 'react';
 import Link from 'next/link';
 import { supabase } from '@/../lib/supabaseClient';
-import { Plus, Clock, FolderOpen, Trash2, ImageUp, Phone, Icon as LucideIcon } from 'lucide-react';
+import { Plus, Clock, Trash2, ImageUp, Phone, Icon as LucideIcon } from 'lucide-react';
 
 /* ---------------- Deterministic UTC date formatter (hydration-safe) ---------------- */
 function fmtUTC(input: string | number | Date | null | undefined) {
@@ -22,7 +21,7 @@ function fmtUTC(input: string | number | Date | null | undefined) {
 type Workplace = {
   id: string;
   user_id: string;
-  name: string;               // unified identifier: "Project Name / Site no. / Project no. or Address"
+  name: string;
   address: string | null;
   company_name: string | null;
   created_at: string;
@@ -44,14 +43,6 @@ type ProfileLite = {
 };
 
 type MonthEntry = { minutes: number; work_date: string };
-
-type Props = {
-  userId: string;
-  profile: ProfileLite | null;
-  workplaces: Workplace[];
-  monthEntries?: MonthEntry[];
-  lastEntryAt?: string | null;
-};
 
 /* ----------------------------------- Small helpers ---------------------------------- */
 function Row({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) {
@@ -78,14 +69,20 @@ function getISOWeek(date: Date) { const d = new Date(date); const day = (d.getDa
 /** Big, tappable tile used in the Recent section */
 function BigTile({
   href, onClick, icon: Icon, label, tone = 'neutral',
-}: { href?: string; onClick?: () => void; icon: LucideIcon; label: string; tone?: 'primary' | 'neutral'; }) {
+}: { href?: string; onClick?: () => void; icon: LucideIcon; label: string; tone?: 'primary' | 'neutral' | 'danger'; }) {
   const base = 'w-full rounded-2xl px-6 py-16 flex items-center justify-center text-center border';
-  const look = tone === 'primary' ? 'bg-blue-600 text-white hover:bg-blue-700 border-blue-600' : 'bg-white text-slate-900 hover:bg-slate-50 border-slate-200';
-  const text = tone === 'primary' ? 'text-3xl md:text-4xl font-extrabold' : 'text-3xl md:text-4xl font-bold';
+  const look =
+    tone === 'primary'
+      ? 'bg-blue-600 text-white hover:bg-blue-700 border-blue-600'
+      : tone === 'danger'
+      ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+      : 'bg-white text-slate-900 hover:bg-slate-50 border-slate-200';
+  const iconClass = tone === 'neutral' ? 'h-12 w-12 text-slate-800' : 'h-12 w-12';
+  const text = 'text-3xl md:text-4xl font-extrabold';
   const Inner = (
     <div className={`${base} ${look}`}>
       <div className="flex flex-col items-center gap-4">
-        <Icon className={tone === 'primary' ? 'h-12 w-12' : 'h-12 w-12 text-slate-800'} />
+        <Icon className={iconClass} />
         <span className={text}>{label.toUpperCase()}</span>
       </div>
     </div>
@@ -94,7 +91,7 @@ function BigTile({
   return <Link href={href ?? '#'} className="w-full">{Inner}</Link>;
 }
 
-/* ---------------------------- Register Time Modal (mobile-safe) ---------------------------- */
+/* ---------------------------- Register Time Modal ---------------------------- */
 function RegisterTimeModal({
   open, onClose, userId, workplaceId,
 }: { open: boolean; onClose: (refresh?: boolean) => void; userId: string; workplaceId: string | null; }) {
@@ -116,18 +113,12 @@ function RegisterTimeModal({
     if (open) { setWorkDate(today); setStart('07:00'); setEnd('16:00'); setBreakMin(30); setErr(null); }
   }, [open, today]);
 
-  // Robustly open native pickers across Chrome, Safari iOS, Android WebViews
   function openPicker(ref: React.RefObject<HTMLInputElement>) {
     const el = ref.current; if (!el) return;
     try {
-      // @ts-ignore - not in all TS dom libs
-      if (typeof el.showPicker === 'function') {
-        el.focus({ preventScroll: true });
-        // @ts-ignore
-        el.showPicker();
-        return;
-      }
-    } catch { /* fall through */ }
+      // @ts-ignore
+      if (typeof el.showPicker === 'function') { el.focus({ preventScroll: true }); /* @ts-ignore */ el.showPicker(); return; }
+    } catch {}
     const wasReadOnly = el.readOnly;
     el.readOnly = false;
     el.focus({ preventScroll: true });
@@ -171,7 +162,6 @@ function RegisterTimeModal({
         <h3 className="text-2xl font-semibold">Register time</h3>
         {err && <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-base text-red-700">{err}</div>}
         <div className="mt-6 grid grid-cols-1 gap-5">
-          {/* Date */}
           <div
             className={fieldWrap}
             onClick={() => openPicker(dateRef)}
@@ -192,7 +182,7 @@ function RegisterTimeModal({
               inputMode="none"
             />
           </div>
-          {/* Times */}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div
               className={fieldWrap}
@@ -237,7 +227,7 @@ function RegisterTimeModal({
               <p className="mt-2 text-xs text-slate-500">Tap anywhere on this box to open the time wheel</p>
             </div>
           </div>
-          {/* Break select */}
+
           <div className="rounded-2xl border p-4 sm:p-5 bg-white">
             <label className="block text-slate-600 text-base mb-2">Break (minutes)</label>
             <div className="relative">
@@ -256,6 +246,105 @@ function RegisterTimeModal({
           <button className="flex-1 rounded-xl border px-5 py-4 text-lg hover:bg-slate-50" onClick={() => onClose()}>Cancel</button>
           <button className="flex-1 rounded-xl bg-blue-600 text-white px-5 py-4 text-lg hover:bg-blue-700 disabled:opacity-60" disabled={saving} onClick={submit}>
             {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------ Delete Hours Modal ---------------------------------- */
+function DeleteHoursModal({
+  open, onClose, userId, workplaceId,
+}: { open: boolean; onClose: (refresh?: boolean) => void; userId: string; workplaceId: string | null; }) {
+  const [rows, setRows] = React.useState<Array<{ id: string; started_at: string; ended_at: string; break_minutes: number | null }>>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [deleting, setDeleting] = React.useState<string | null>(null);
+  const [err, setErr] = React.useState<string | null>(null);
+
+  const load = React.useCallback(async () => {
+    if (!open || !workplaceId) return;
+    setLoading(true); setErr(null);
+    // Show last 90 days of entries for this workplace
+    const since = new Date(); since.setDate(since.getDate() - 90);
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('id, started_at, ended_at, break_minutes')
+      .eq('user_id', userId)
+      .eq('workplace_id', workplaceId)
+      .gte('started_at', since.toISOString())
+      .order('started_at', { ascending: false });
+    setLoading(false);
+    if (error) { setErr(error.message); setRows([]); return; }
+    setRows((data ?? []) as any);
+  }, [open, workplaceId, userId]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  function minsOfRow(sISO: string, eISO: string, b?: number | null) {
+    const s = new Date(sISO).getTime(); const e = new Date(eISO).getTime();
+    return Math.max(0, Math.round((e - s) / 60000) - (b ?? 0));
+  }
+
+  async function del(id: string) {
+    try {
+      setDeleting(id);
+      const { error } = await supabase.from('time_entries').delete().eq('id', id).eq('user_id', userId);
+      if (error) throw error;
+      setRows((prev) => prev.filter((r) => r.id !== id));
+    } catch (e: any) {
+      setErr(e?.message || 'Failed to delete.');
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[85]">
+      <div className="absolute inset-0 bg-black/40" onClick={() => onClose()} />
+      <div className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8">
+        <h3 className="text-2xl font-semibold">Delete hours</h3>
+        <p className="mt-2 text-sm text-slate-600">Your registered worklogs for this workplace (last 90 days).</p>
+        {err && <div className="mt-3 rounded-md bg-red-50 px-4 py-3 text-red-700">{err}</div>}
+
+        {loading ? (
+          <div className="mt-5 text-sm text-slate-500">Loading…</div>
+        ) : rows.length === 0 ? (
+          <div className="mt-5 text-sm text-slate-500">No worklogs found.</div>
+        ) : (
+          <ul className="mt-4 divide-y">
+            {rows.map((r) => {
+              const d = new Date(r.started_at);
+              const date = d.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+              const start = new Date(r.started_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+              const end = new Date(r.ended_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+              const mins = minsOfRow(r.started_at, r.ended_at, r.break_minutes);
+              return (
+                <li key={r.id} className="flex items-center justify-between py-3">
+                  <div className="text-sm">
+                    <div className="font-semibold text-slate-900">{date}</div>
+                    <div className="text-slate-600">{start}–{end} • {hhmm(mins)}</div>
+                  </div>
+                  <button
+                    onClick={() => del(r.id)}
+                    disabled={deleting === r.id}
+                    className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                    title="Delete entry"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {deleting === r.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="mt-6 flex justify-end">
+          <button className="rounded-xl border px-5 py-3 text-base hover:bg-slate-50" onClick={() => onClose(rows.length > 0)}>
+            Close
           </button>
         </div>
       </div>
@@ -326,7 +415,6 @@ function splitOvertime(weekTotalMin: number) {
 }
 
 /* ------------------------ Available workplaces (active) picker ----------------------- */
-/* NOTE: site_number/project_number removed → just show the unified name */
 function AvailableWorkplacesGrid({
   disabled, already, onAdded,
 }: { disabled?: boolean; already: Set<string>; onAdded: (id: string) => void; }) {
@@ -398,16 +486,21 @@ function AvailableWorkplacesGrid({
 /* ------------------------------------ Component ------------------------------------- */
 export default function DashboardClient({
   userId, profile, workplaces: initialWps, monthEntries = [], lastEntryAt,
-}: Props) {
+}: {
+  userId: string;
+  profile: ProfileLite | null;
+  workplaces: Workplace[];
+  monthEntries?: MonthEntry[];
+  lastEntryAt?: string | null;
+}) {
   const [wps, setWps] = React.useState<Workplace[]>(initialWps ?? []);
 
-  // live profile-status state (init from server prop)
+  // live profile-status
   const [profileStatus, setProfileStatus] =
     React.useState<'under_review' | 'approved' | 'rejected'>(
       (profile?.profile_status as any) ?? (profile?.status as any) ?? 'under_review'
     );
 
-  // Fetch latest once on mount and subscribe to realtime updates
   React.useEffect(() => {
     let cancelled = false;
     async function fetchLatest() {
@@ -427,11 +520,15 @@ export default function DashboardClient({
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [userId]);
 
-  // modal state
+  // modals
   const [regOpen, setRegOpen] = React.useState(false);
   const [regWpId, setRegWpId] = React.useState<string | null>(null);
+
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [uploadWpId, setUploadWpId] = React.useState<string | null>(null);
+
+  const [delOpen, setDelOpen] = React.useState(false);
+  const [delWpId, setDelWpId] = React.useState<string | null>(null);
 
   // ---------------------- Fetch last ~45 days for weekly & calendar -------------------
   type RawEntry = { started_at: string; ended_at: string; break_minutes: number; workplace_id: string };
@@ -447,7 +544,7 @@ export default function DashboardClient({
       .eq('user_id', userId)
       .gte('started_at', since.toISOString())
       .order('started_at', { ascending: true });
-    if (!error && data) setRecent(data as RawEntry[]);
+    if (!error && data) setRecent(data as RawEntry[]); else setRecent([]);
     setLoadingStats(false);
   }, [userId]);
 
@@ -537,9 +634,12 @@ export default function DashboardClient({
 
   function openRegister(wpId: string) { setRegWpId(wpId); setRegOpen(true); }
   function closeRegister(refresh?: boolean) { setRegOpen(false); setRegWpId(null); if (refresh) { loadRecent(); } }
-  function openUpload(wpId: string) { setUploadWpId(wpId); setUploadOpen(true); }
 
-  // Unlink workplace for THIS user only
+  function openUpload(wpId: string) { setUploadWpId(wpId); setUploadOpen(true); }
+  function openDeleteHours(wpId: string) { setDelWpId(wpId); setDelOpen(true); }
+  function closeDeleteHours(refresh?: boolean) { setDelOpen(false); setDelWpId(null); if (refresh) { loadRecent(); } }
+
+  // Unlink workplace for THIS user only (still allowed)
   async function deleteWorkplace(workplaceId: string, _createdAt: string) {
     try {
       const res = await fetch(`/api/user-workplaces?workplace_id=${encodeURIComponent(workplaceId)}`, { method: 'DELETE' });
@@ -557,6 +657,7 @@ export default function DashboardClient({
   return (
     <>
       <RegisterTimeModal open={regOpen} onClose={closeRegister} userId={userId} workplaceId={regWpId} />
+      <DeleteHoursModal open={delOpen} onClose={closeDeleteHours} userId={userId} workplaceId={delWpId} />
       <UploadPhotoModal open={uploadOpen} onClose={() => { setUploadOpen(false); setUploadWpId(null); }} workplaceId={uploadWpId} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -611,7 +712,7 @@ export default function DashboardClient({
               </div>
             </div>
 
-            {/* Navigable month calendar (per-day totals) */}
+            {/* Navigable month calendar */}
             <div className="mt-6">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-sm font-semibold">
@@ -682,17 +783,10 @@ export default function DashboardClient({
                   <div className="text-2xl font-semibold">{wps[0].name}</div>
                   <div className="mt-1 text-sm text-slate-500">Created {fmtUTC(wps[0].created_at)} • Updated {fmtUTC(wps[0].updated_at)}</div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
                   <BigTile onClick={() => openRegister(wps[0].id)} icon={Clock} label="Register Time" tone="primary" />
+                  <BigTile onClick={() => openDeleteHours(wps[0].id)} icon={Trash2} label="Delete hours" tone="danger" />
                   {profileStatus === 'approved' && <BigTile onClick={() => openUpload(wps[0].id)} icon={ImageUp} label="Upload Photo" tone="neutral" />}
-                  <div className="flex flex-col gap-3 w-full md:w-56">
-                    <Link href={`/dashboard/workplaces/${wps[0].id}`} className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 h-14 text-base hover:bg-slate-50"><FolderOpen className="h-5 w-5" />Open Project</Link>
-                    {Date.now() - new Date(wps[0].created_at).getTime() < 24 * 60 * 60 * 1000 && (
-                      <button onClick={() => deleteWorkplace(wps[0].id, wps[0].created_at)} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 h-14 text-base text-red-600 hover:bg-red-50">
-                        <Trash2 className="h-5 w-5" /> Delete
-                      </button>
-                    )}
-                  </div>
                 </div>
               </div>
             ) : <div className="mt-3 text-sm text-slate-500">No workplaces yet.</div>}
@@ -708,21 +802,21 @@ export default function DashboardClient({
                 {wps.map((wp) => {
                   const canDelete = Date.now() - new Date(wp.created_at).getTime() < 24 * 60 * 60 * 1000;
                   return (
-                    <li key={wp.id} className="rounded-2xl border p-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <li key={wp.id} className="rounded-2xl border p-6 md:p-8 flex flex-col gap-4">
                       <div className="min-w-0">
-                        <div className="text-xl font-semibold flex items-center gap-2"><FolderOpen className="h-6 w-5 text-slate-700" /><span className="truncate">{wp.name}</span></div>
+                        <div className="text-xl font-semibold truncate">{wp.name}</div>
                         {wp.address && <div className="mt-1 text-sm text-slate-600 line-clamp-2">{wp.address}</div>}
                         <div className="mt-2 text-xs text-slate-500">Created: {fmtUTC(wp.created_at)} • Updated: {fmtUTC(wp.updated_at)}</div>
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
-                        <button onClick={() => openRegister(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-white text-lg font-bold hover:bg-blue-700"><Clock className="h-20 w-5" />REGISTER TIME</button>
+                        <button onClick={() => openRegister(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-white text-lg font-bold hover:bg-blue-700"><Clock className="h-5 w-5" />REGISTER TIME</button>
+                        <button onClick={() => openDeleteHours(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-4 text-white text-lg font-bold hover:bg-red-700"><Trash2 className="h-5 w-5" />DELETE HOURS</button>
                         {profileStatus === 'approved' && (
-                          <button onClick={() => openUpload(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-4 text-lg font-semibold hover:bg-slate-50"><ImageUp className="h-20 w-5" />Upload Photo</button>
+                          <button onClick={() => openUpload(wp.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-4 text-lg font-semibold hover:bg-slate-50"><ImageUp className="h-5 w-5" />Upload Photo</button>
                         )}
-                        <Link href={`/dashboard/workplaces/${wp.id}`} className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-base font-medium hover:bg-slate-50"><FolderOpen className="h-5 w-5" />Open Project</Link>
                         {canDelete && (
                           <button onClick={() => deleteWorkplace(wp.id, wp.created_at)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-3 text-base text-red-600 hover:bg-red-50">
-                            <Trash2 className="h-5 w-5" /> Delete
+                            <Trash2 className="h-5 w-5" /> Remove from my list
                           </button>
                         )}
                       </div>

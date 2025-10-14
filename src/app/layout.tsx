@@ -8,13 +8,13 @@ import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'DanskArbejdskraft — Construction Staffing',
+  title: 'Dansk Arbejdskraft — Bemanding til byggebranchen',
   description:
-    'Project-based and flexible staffing for construction: carpenters, concrete workers, masonry, civil works and more. Fast onboarding, compliant payroll, and approved timesheets.',
+    'Vores prioriteter er vores folk og jeres projekt. Vores virksomhed er bygget på kvalitet og et netværk af dygtige specialister på tværs af flere byggeområder.',
   openGraph: {
-    title: 'DanskArbejdskraft',
+    title: 'Dansk Arbejdskraft — Bemanding til byggebranchen',
     description:
-      'Project-based and flexible staffing for construction: carpenters, concrete workers, masonry, civil works and more.',
+      'Vores prioriteter er vores folk og jeres projekt. Vores virksomhed er bygget på kvalitet og et netværk af dygtige specialister på tværs af flere byggeområder.',
     type: 'website',
   },
 };
