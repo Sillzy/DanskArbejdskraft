@@ -1,3 +1,4 @@
+ //src/app/api/admin/workplaces/route.ts
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/../lib/supabase-server';
 

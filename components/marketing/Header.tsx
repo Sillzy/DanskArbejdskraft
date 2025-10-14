@@ -35,13 +35,11 @@ const fields: Item[] = [
 const about: Item[] = [{ label: 'Mød teamet', href: '/about/meet-the-team' }];
 const contact: Item[] = [{ label: 'Kontor', href: '/contact/office' }];
 
-/* ---------- Small helpers ---------- */
-
 function Brand({ size = 48 }: { size?: number }) {
   return (
     <Link href="/" className="inline-flex items-center" prefetch={false}>
       <Image
-        src="/Logo.png"                 // /public/Logo.png
+        src="/Logo.png"
         alt="Dansk Arbejdskraft"
         width={size * 4}
         height={size}
@@ -55,7 +53,6 @@ function Brand({ size = 48 }: { size?: number }) {
 
 function NavMenu({ label, items }: { label: string; items: Item[] }) {
   const [open, setOpen] = useState(false);
-
   return (
     <div
       className="relative"
@@ -106,15 +103,12 @@ function NavMenu({ label, items }: { label: string; items: Item[] }) {
   );
 }
 
-/* ---------- Header ---------- */
-
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileSub, setMobileSub] = useState<string | null>(null);
   const session = useSession();
   const router = useRouter();
 
-  // Admin state via RPC is_admin(uuid)
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -173,91 +167,91 @@ export default function Header() {
   );
 
   return (
-    <header
-      className="
-        sticky top-0 z-50
-        bg-white shadow-sm
-        border-b border-slate-200
-        supports-[backdrop-filter]:bg-white/90 supports-[backdrop-filter]:backdrop-blur
-      "
-      role="banner"
-    >
-      <nav className="mx-auto flex h-16 md:h-20 max-w-7xl items-center justify-between px-4">
-        {/* Brand */}
-        <Brand />
+    <>
+      {/* fixed header; -mb-px removes the tiny seam */}
+      <header
+        className="
+          fixed top-0 inset-x-0 z-50 -mb-px
+          bg-white shadow-sm border-b border-slate-200
+          supports-[backdrop-filter]:bg-white/90 supports-[backdrop-filter]:backdrop-blur
+        "
+        role="banner"
+      >
+        <nav className="mx-auto flex h-16 md:h-20 max-w-7xl items-center justify-between px-4">
+          <Brand />
 
-        {/* desktop nav */}
-        <div className="hidden items-center gap-8 md:flex">
-          <NavMenu label="Ydelser" items={services} />
-          <NavMenu label="Fagområder" items={fields} />
-          <NavMenu label="Om os" items={about} />
-          <NavMenu label="Kontakt" items={contact} />
-        </div>
+          <div className="hidden items-center gap-8 md:flex">
+            <NavMenu label="Ydelser" items={services} />
+            <NavMenu label="Fagområder" items={fields} />
+            <NavMenu label="Om os" items={about} />
+            <NavMenu label="Kontakt" items={contact} />
+          </div>
 
-        {/* desktop actions */}
-        <div className="hidden items-center gap-3 md:flex">
-          {session ? (
-            <>
-              {isAdmin && (
+          <div className="hidden items-center gap-3 md:flex">
+            {session ? (
+              <>
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    prefetch={false}
+                    className="rounded-lg border border-amber-500 px-5 py-2 text-amber-600 hover:bg-amber-50"
+                  >
+                    Admin
+                  </Link>
+                )}
                 <Link
-                  href="/admin"
+                  href="/dashboard"
                   prefetch={false}
-                  className="rounded-lg border border-amber-500 px-5 py-2 text-amber-600 hover:bg-amber-50"
+                  className="rounded-lg border border-blue-500 px-5 py-2 text-blue-500 hover:bg-blue-50"
                 >
-                  Admin
+                  Min side
                 </Link>
-              )}
-              <Link
-                href="/dashboard"
-                prefetch={false}
-                className="rounded-lg border border-blue-500 px-5 py-2 text-blue-500 hover:bg-blue-50"
-              >
-                Min side
-              </Link>
-              <button
-                onClick={logout}
-                className="rounded-lg bg-blue-500 px-5 py-2 text-white hover:bg-blue-600"
-                type="button"
-              >
-                Log ud
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/signup?next=/dashboard/onboarding"
-                prefetch={false}
-                className="rounded-lg border border-blue-500 px-5 py-2 text-blue-500 hover:bg-blue-50"
-              >
-                Bliv medarbejder
-              </Link>
-              <Link
-                href="/login"
-                prefetch={false}
-                className="rounded-lg bg-blue-500 px-5 py-2 text-white hover:bg-blue-600"
-              >
-                Log ind
-              </Link>
-            </>
-          )}
-        </div>
+                <button
+                  onClick={logout}
+                  className="rounded-lg bg-blue-500 px-5 py-2 text-white hover:bg-blue-600"
+                  type="button"
+                >
+                  Log ud
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/signup?next=/dashboard/onboarding"
+                  prefetch={false}
+                  className="rounded-lg border border-blue-500 px-5 py-2 text-blue-500 hover:bg-blue-50"
+                >
+                  Bliv medarbejder
+                </Link>
+                <Link
+                  href="/login"
+                  prefetch={false}
+                  className="rounded-lg bg-blue-500 px-5 py-2 text-white hover:bg-blue-600"
+                >
+                  Log ind
+                </Link>
+              </>
+            )}
+          </div>
 
-        {/* mobile trigger */}
-        <button
-          className="md:hidden"
-          aria-label="Åbn menu"
-          onClick={() => setMobileOpen(true)}
-          type="button"
-        >
-          <MenuIcon className="h-6 w-6" />
-        </button>
-      </nav>
+          <button
+            className="md:hidden"
+            aria-label="Åbn menu"
+            onClick={() => setMobileOpen(true)}
+            type="button"
+          >
+            <MenuIcon className="h-6 w-6" />
+          </button>
+        </nav>
+      </header>
+
+      {/* spacer pushes the page down exactly the header height */}
+      <div className="h-16 md:h-20" />
 
       {/* MOBILE OVERLAY + SHEET */}
       <AnimatePresence>
         {mobileOpen && (
           <div className="md:hidden">
-            {/* dark backdrop behind the sheet */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.4 }}
@@ -265,18 +259,12 @@ export default function Header() {
               className="fixed inset-0 z-40 bg-black"
               onClick={() => setMobileOpen(false)}
             />
-
-            {/* the sheet */}
             <motion.nav
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'tween', duration: 0.2 }}
-              className="
-                fixed right-0 top-0 z-50 w-full max-w-sm
-                h-dvh overflow-y-auto
-                bg-white shadow-2xl
-              "
+              className="fixed right-0 top-0 z-50 w-full max-w-sm h-dvh overflow-y-auto bg-white shadow-2xl"
               role="dialog"
               aria-modal="true"
             >
@@ -356,6 +344,6 @@ export default function Header() {
           </div>
         )}
       </AnimatePresence>
-    </header>
+    </>
   );
 }
