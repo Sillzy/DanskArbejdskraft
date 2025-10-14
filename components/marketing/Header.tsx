@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // ⬅️ add usePathname
 import { useEffect, useState } from 'react';
 import { ChevronDown, Menu as MenuIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -108,6 +108,9 @@ export default function Header() {
   const [mobileSub, setMobileSub] = useState<string | null>(null);
   const session = useSession();
   const router = useRouter();
+  const pathname = usePathname();               // ⬅️ where are we?
+
+  const showSpacer = pathname !== '/';          // ⬅️ no spacer on the homepage hero
 
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
@@ -136,9 +139,7 @@ export default function Header() {
         type="button"
       >
         {title}
-        <ChevronDown
-          className={`h-4 w-4 transition ${mobileSub === title ? 'rotate-180' : ''}`}
-        />
+        <ChevronDown className={`h-4 w-4 transition ${mobileSub === title ? 'rotate-180' : ''}`} />
       </button>
       <AnimatePresence initial={false}>
         {mobileSub === title && (
@@ -168,10 +169,10 @@ export default function Header() {
 
   return (
     <>
-      {/* fixed header; -mb-px removes the tiny seam */}
+      {/* Fixed header */}
       <header
         className="
-          fixed top-0 inset-x-0 z-50 -mb-px
+          fixed top-0 inset-x-0 z-50
           bg-white shadow-sm border-b border-slate-200
           supports-[backdrop-filter]:bg-white/90 supports-[backdrop-filter]:backdrop-blur
         "
@@ -245,10 +246,10 @@ export default function Header() {
         </nav>
       </header>
 
-      {/* spacer pushes the page down exactly the header height */}
-      <div className="h-16 md:h-20" />
+      {/* Spacer only on pages that need it */}
+      {showSpacer && <div className="h-16 md:h-20" />}
 
-      {/* MOBILE OVERLAY + SHEET */}
+      {/* Mobile overlay + sheet */}
       <AnimatePresence>
         {mobileOpen && (
           <div className="md:hidden">

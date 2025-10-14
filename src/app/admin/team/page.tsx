@@ -1,3 +1,4 @@
+//src/app/admin/team/page.tsx
 import { getServerSupabase } from '@/../lib/supabase-server';
 import ProfileEditorRow from './ProfileEditorRow';
 

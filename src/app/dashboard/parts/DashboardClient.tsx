@@ -488,7 +488,6 @@ function UploadPhotoModal({
             ref={inputRef}
             type="file"
             accept="image/*"
-            // capture only on mobile so desktop shows normal picker
             {...(isMobile ? { capture: 'environment' as any } : {})}
             className="hidden"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
@@ -502,9 +501,6 @@ function UploadPhotoModal({
             {file ? `Selected: ${file.name}` : 'Choose Photo'}
           </button>
 
-          <p className="mt-2 text-xs text-slate-500">
-            Works on iPhone/Android/desktop. Take a photo or pick from library.
-          </p>
         </div>
 
         <div className="mt-7 flex gap-3">
@@ -541,6 +537,91 @@ function splitOvertime(weekTotalMin: number) {
   return { regular, otFirst3, otAfter3 };
 }
 
+/* ------------------------ Available workplaces (active) picker ----------------------- */
+function AvailableWorkplacesGrid({
+  disabled,
+  already,
+  onAdded,
+}: {
+  disabled?: boolean;
+  already: Set<string>;
+  onAdded: (id: string) => void;
+}) {
+  const [rows, setRows] = React.useState<Array<{
+    id: string;
+    name: string;
+    site_number: string | null;
+    project_number: string | null;
+  }>>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [adding, setAdding] = React.useState<string | null>(null);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    setErr(null);
+    const { data, error } = await supabase
+      .from('workplaces')
+      .select('id,name,site_number,project_number,is_active')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    setLoading(false);
+    if (error) {
+      setErr(error.message);
+      setRows([]);
+      return;
+    }
+    const list = (data ?? []).filter((r: any) => !already.has(r.id));
+    setRows(list as any);
+  }, [already]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  async function add(id: string) {
+    if (disabled) return;
+    setAdding(id);
+    const res = await fetch('/api/user-workplaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workplace_id: id }),
+    });
+    setAdding(null);
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      alert(j?.error || 'Failed to add workplace.');
+      return;
+    }
+    onAdded(id);
+    setRows((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  if (loading) return <p className="mt-3 text-sm text-slate-500">Loading…</p>;
+  if (err) return <p className="mt-3 text-sm text-red-600">{err}</p>;
+  if (rows.length === 0) return <p className="mt-3 text-sm text-slate-500">No active workplaces available.</p>;
+
+  return (
+    <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {rows.map((r) => {
+        const label = [r.name, r.site_number, r.project_number].filter(Boolean).join(' / ');
+        return (
+          <li key={r.id}>
+            <button
+              type="button"
+              disabled={disabled || adding === r.id}
+              onClick={() => add(r.id)}
+              className="w-full rounded-xl border p-4 text-left hover:bg-slate-50 disabled:opacity-60"
+              title="Add workplace"
+            >
+              <div className="text-sm text-slate-500">Add +</div>
+              <div className="mt-1 text-base font-semibold">{label}</div>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /* ------------------------------------ Component ------------------------------------- */
 export default function DashboardClient({
   userId,
@@ -549,11 +630,6 @@ export default function DashboardClient({
   monthEntries = [],
   lastEntryAt,
 }: Props) {
-  const [name, setName] = React.useState('');
-  const [company, setCompany] = React.useState('');
-  const [address, setAddress] = React.useState('');
-  const [saving, setSaving] = React.useState(false);
-  const [err, setErr] = React.useState<string | null>(null);
   const [wps, setWps] = React.useState<Workplace[]>(initialWps ?? []);
 
   // live profile-status state (init from server prop)
@@ -576,7 +652,7 @@ export default function DashboardClient({
         .eq('user_id', userId)
         .single();
 
-      if (!cancelled && !error && data?.profile_status) {
+    if (!cancelled && !error && data?.profile_status) {
         setProfileStatus(data.profile_status as any);
       }
     }
@@ -762,52 +838,6 @@ export default function DashboardClient({
   const monthStart = startOfMonth(new Date());
   const monthEnd = endOfMonth(new Date());
   const daysInMonth = rangeDays(monthStart, monthEnd);
-
-  // -----------------------------------------------------------------------------------
-
-  async function createWorkplace(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null);
-    if (!name.trim()) {
-      setErr('Please enter a workplace name.');
-      return;
-    }
-    setSaving(true);
-    const { data, error } = await supabase
-      .from('workplaces')
-      .insert({
-        user_id: userId,
-        name: name.trim(),
-        address: address.trim() || null,
-        company_name: company.trim() || null,
-      })
-      .select('*')
-      .single();
-    setSaving(false);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-    setWps((prev) => [data as Workplace, ...prev]);
-    setName('');
-    setCompany('');
-    setAddress('');
-  }
-
-  async function deleteWorkplace(id: string, created_at: string) {
-    const within24h =
-      Date.now() - new Date(created_at).getTime() < 24 * 60 * 60 * 1000;
-    if (!within24h) return;
-    if (!confirm('Delete this workplace? This action cannot be undone.')) return;
-
-    const { error } = await supabase.from('workplaces').delete().eq('id', id);
-    if (error) {
-      alert(error.message);
-      return;
-    }
-    setWps((prev) => prev.filter((w) => w.id !== id));
-  }
 
   function openRegister(wpId: string) {
     setRegWpId(wpId);

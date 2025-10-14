@@ -1,8 +1,7 @@
- //src/app/api/admin/workplaces/route.ts
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/../lib/supabase-server';
 
-/** POST { id, field, value } – admin-only update of a workplace text field */
+/** POST { id, field, value } – admin-only update of a workplace field */
 export async function POST(req: Request) {
   const supabase = await getServerSupabase();
 
@@ -20,33 +19,41 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null) as {
     id?: string;
     field?: string;
-    value?: string | null;
+    value?: any;
   } | null;
 
   if (!body?.id || typeof body.field !== 'string') {
     return NextResponse.json({ error: 'Missing id or field' }, { status: 400 });
   }
 
-  const allowed = new Set(['name', 'company_name', 'company_cvr', 'invoice_email']);
+  const allowed = new Set([
+    'name',
+    'site_number',
+    'project_number',
+    'company_name',
+    'company_cvr',
+    'invoice_email',
+    'address',
+    'is_active',
+  ]);
   if (!allowed.has(body.field)) {
     return NextResponse.json({ error: 'Field not allowed' }, { status: 400 });
   }
 
-  // normalize value
-  const v =
-    body.value === undefined
-      ? null
-      : (typeof body.value === 'string' && body.value.trim() === '' ? null : body.value);
-
-  // update
-  const { error } = await supabase
-    .from('workplaces')
-    .update({ [body.field]: v })
-    .eq('id', body.id);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  // normalize value for text fields
+  let v: any = body.value;
+  if (['name','site_number','project_number','company_name','company_cvr','invoice_email','address'].includes(body.field)) {
+    v =
+      v === undefined || v === null
+        ? null
+        : (typeof v === 'string' && v.trim() === '' ? null : String(v));
   }
+  if (body.field === 'is_active') {
+    v = !!v;
+  }
+
+  const { error } = await supabase.from('workplaces').update({ [body.field]: v }).eq('id', body.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   return NextResponse.json({ ok: true });
 }

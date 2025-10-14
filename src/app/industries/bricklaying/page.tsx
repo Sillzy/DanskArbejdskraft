@@ -48,6 +48,19 @@ export default function Page() {
         image={{ src: '/Marketing/Bricklaying1.jpg', alt: 'Facademurværk på byggeplads' }}
       />
 
+      {/* Ekstra billede – samme indhold, nyt foto */}
+      <SectionSplit
+        title="Facade & blokarbejde"
+        icon={<Layers className="h-5 w-5 text-blue-600" />}
+        bullets={[
+          'Facademurværk og blokarbejde',
+          'Overliggere, buer og detaljearbejde',
+          'Beskyttelse og pæn præsentation',
+        ]}
+        note="Vi koordinerer adgang, materialer og stilladsbehov, så holdet er produktivt, og facaden forbliver beskyttet."
+        image={{ src: '/Marketing/Bricklaying2.jpg', alt: 'Facademurværk – ekstra billede' }}
+      />
+
       {/* Præcision & finish (tekst først, intet ekstra foto) */}
       <section className="grid items-center gap-8 py-6 md:grid-cols-12 md:gap-12 md:py-10">
         <div className="md:col-span-6">

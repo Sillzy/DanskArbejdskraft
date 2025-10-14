@@ -1,3 +1,4 @@
+//src/app/api/admin/profile/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteHandlerSupabase } from '@/../lib/supabase-server';
 

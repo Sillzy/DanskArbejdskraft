@@ -1,4 +1,3 @@
-//src/app/admin/page.tsx
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getServerSupabase } from '@/../lib/supabase-server';
@@ -39,6 +38,90 @@ function splitOvertime(minWeek: number) {
 }
 const h1 = (mins: number) => (mins / 60).toFixed(1);
 
+/* ---------- Small client helpers embedded (toggle + creator) ---------- */
+function ActiveToggleClient({ id, value }: { id: string; value: boolean }) {
+  return (
+    <form
+      action={async () => {
+        'use server';
+        const supabase = await getServerSupabase();
+        const { data: auth } = await supabase.auth.getUser();
+        if (!auth.user) return;
+        const { data: isAdmin } = await supabase.rpc('is_admin', { p_uid: auth.user.id });
+        if (!isAdmin) return;
+        await supabase.from('workplaces').update({ is_active: !value }).eq('id', id);
+      }}
+    >
+      <button
+        type="submit"
+        className={`inline-flex items-center rounded-full px-2 py-1 text-xs ring-1 ${
+          value
+            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+            : 'bg-slate-50 text-slate-600 ring-slate-200'
+        }`}
+        title="Toggle active"
+      >
+        <span
+          className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${
+            value ? 'bg-emerald-500' : 'bg-slate-400'
+          }`}
+        />
+        {value ? 'Active' : 'Inactive'}
+      </button>
+    </form>
+  );
+}
+
+function CreateWorkplaceServerForm() {
+  async function create(formData: FormData) {
+    'use server';
+    const supabase = await getServerSupabase();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
+    const { data: isAdmin } = await supabase.rpc('is_admin', { p_uid: auth.user.id });
+    if (!isAdmin) return;
+
+    const name = String(formData.get('name') || '').trim();
+    const site_number = String(formData.get('site_number') || '').trim();
+    const project_number = String(formData.get('project_number') || '').trim();
+    const company_name = String(formData.get('company_name') || '').trim() || null;
+    const address = String(formData.get('address') || '').trim() || null;
+    const company_cvr = String(formData.get('company_cvr') || '').trim() || null;
+    const invoice_email = String(formData.get('invoice_email') || '').trim() || null;
+
+    if (!name || !site_number || !project_number) return;
+
+    await supabase.from('workplaces').insert({
+      name,
+      site_number,
+      project_number,
+      company_name,
+      address,
+      company_cvr,
+      invoice_email,
+      is_active: true,
+    });
+  }
+
+  return (
+    <form action={create} className="mt-2 grid grid-cols-1 gap-3 lg:grid-cols-3">
+      <input name="name" className="rounded-lg border p-3" placeholder="Project Name" required />
+      <input name="site_number" className="rounded-lg border p-3" placeholder="Site Number" required />
+      <input name="project_number" className="rounded-lg border p-3" placeholder="Project Number" required />
+      <input name="company_name" className="rounded-lg border p-3" placeholder="Company name (optional)" />
+      <input name="address" className="rounded-lg border p-3 lg:col-span-2" placeholder="Full Address (optional)" />
+      <input name="company_cvr" className="rounded-lg border p-3" placeholder="CVR (optional)" />
+      <input name="invoice_email" type="email" className="rounded-lg border p-3 lg:col-span-2" placeholder="Invoice email (optional)" />
+      <button
+        type="submit"
+        className="lg:col-span-3 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-white text-lg font-semibold hover:bg-blue-700"
+      >
+        Create workplace
+      </button>
+    </form>
+  );
+}
+
 export default async function AdminPage() {
   const supabase = await getServerSupabase();
 
@@ -66,23 +149,22 @@ export default async function AdminPage() {
   const { data: workers = [] } = await supabase
     .from('profiles')
     .select('user_id, first_name, last_name, email, phone, bank_reg_no, bank_account_no, swift, iban, profile_status')
-    .eq('profile_status', 'approved')         // <— was .eq('team_approved', true)
+    .eq('profile_status', 'approved')
     .order('first_name', { ascending: true });
 
   const approvedIds = (workers as any[]).map((w) => w.user_id as string);
   const hasWorkers = approvedIds.length > 0;
 
-  // All workplaces (with editable business fields)
+  // All workplaces (with extra business fields)
   const { data: workplaces = [] } = await supabase
     .from('workplaces')
-    .select('id, name, company_name, company_cvr, invoice_email')
+    .select('id, name, site_number, project_number, company_name, company_cvr, invoice_email, is_active')
     .order('name', { ascending: true });
 
   const wpNameById = new Map<string, string>();
   (workplaces as any[]).forEach((w) => wpNameById.set(w.id, w.name));
 
   // Time windows
-  // 8-week ISO window: current week + previous 7 weeks
   const mondayThisWeek = startOfISOWeek(new Date());
   const monday7wAgo = addDaysUTC(mondayThisWeek, -7 * 7);
   const rangeStart = monday7wAgo;
@@ -236,16 +318,26 @@ export default async function AdminPage() {
       {/* ======================= Workplaces FIRST ======================= */}
       <section className="rounded-2xl border bg-white p-5 overflow-x-auto">
         <h2 className="text-lg font-semibold mb-3">Workplaces</h2>
-        <div className="mb-3 text-s text-slate-600">
+
+        {/* New creator (admin only) */}
+        <div className="rounded-xl border bg-slate-50 p-4">
+          <div className="font-medium">Create new workplace</div>
+          <CreateWorkplaceServerForm />
+        </div>
+
+        <div className="mt-6 mb-3 text-s text-slate-600">
           Each week cell shows:{' '}
           <span className="font-medium">Total</span> • <span className="font-medium">Weekend</span> •{' '}
           <span className="font-medium">Overtime First 3H</span> • <span className="font-medium">Overtime After 3H</span>
         </div>
 
-        <table className="min-w-[1160px] w-full text-sm">
+        <table className="min-w-[1380px] w-full text-sm">
           <thead>
             <tr className="text-left text-slate-600">
-              <th className="py-2 pr-3">Workplace</th>
+              <th className="py-2 pr-3">Active</th>
+              <th className="py-2 pr-3">Project Name</th>
+              <th className="py-2 pr-3">Site #</th>
+              <th className="py-2 pr-3">Project #</th>
               <th className="py-2 pr-3">Company name</th>
               <th className="py-2 pr-3">CVR</th>
               <th className="py-2 pr-3">Invoice email</th>
@@ -263,42 +355,36 @@ export default async function AdminPage() {
               const row = perWpWeek[wid] || {};
               return (
                 <tr key={wid} className="border-t align-top">
-                  {/* CHANGE: workplace name is now editable */}
-                  <td className="py-2 pr-3 font-medium">
-                    <EditWorkplaceFields
-                      id={wid}
-                      field="name"
-                      value={wp.name ?? ''}
-                      placeholder="Workplace name"
-                    />
-                  </td>
                   <td className="py-2 pr-3">
-                    <EditWorkplaceFields
-                      id={wid}
-                      field="company_name"
-                      value={wp.company_name ?? ''}
-                      placeholder="Company A/S"
-                    />
+                    {/* Active toggle */}
+                    {/* @ts-expect-error Server Action inside Client boundary */}
+                    <ActiveToggleClient id={wid} value={(wp as any).is_active ?? true} />
                   </td>
-                  {/* CHANGE: CVR input visually 50% shorter via a max-width wrapper */}
+
+                  {/* Editable fields */}
+                  <td className="py-2 pr-3 font-medium">
+                    <EditWorkplaceFields id={wid} field="name" value={wp.name ?? ''} placeholder="Workplace name" />
+                  </td>
                   <td className="py-2 pr-3">
                     <div className="max-w-[10rem]">
-                      <EditWorkplaceFields
-                        id={wid}
-                        field="company_cvr"
-                        value={wp.company_cvr ?? ''}
-                        placeholder="CVR"
-                      />
+                      <EditWorkplaceFields id={wid} field="site_number" value={(wp as any).site_number ?? ''} placeholder="Site #" />
                     </div>
                   </td>
                   <td className="py-2 pr-3">
-                    <EditWorkplaceFields
-                      id={wid}
-                      field="invoice_email"
-                      value={wp.invoice_email ?? ''}
-                      placeholder="billing@company.com"
-                      type="email"
-                    />
+                    <div className="max-w-[10rem]">
+                      <EditWorkplaceFields id={wid} field="project_number" value={(wp as any).project_number ?? ''} placeholder="Project #" />
+                    </div>
+                  </td>
+                  <td className="py-2 pr-3">
+                    <EditWorkplaceFields id={wid} field="company_name" value={wp.company_name ?? ''} placeholder="Company A/S" />
+                  </td>
+                  <td className="py-2 pr-3">
+                    <div className="max-w-[10rem]">
+                      <EditWorkplaceFields id={wid} field="company_cvr" value={(wp as any).company_cvr ?? ''} placeholder="CVR" />
+                    </div>
+                  </td>
+                  <td className="py-2 pr-3">
+                    <EditWorkplaceFields id={wid} field="invoice_email" value={(wp as any).invoice_email ?? ''} placeholder="billing@company.com" type="email" />
                   </td>
 
                   {weeks.map((lab) => {

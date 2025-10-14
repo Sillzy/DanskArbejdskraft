@@ -29,17 +29,28 @@ export default async function DashboardPage() {
         'phone_country',
         'phone_number',
         'status',
+        'profile_status',
       ].join(',')
     )
     .eq('user_id', user.id)
     .maybeSingle();
 
-  // ---------- Workplaces (newest first) ----------
-  const { data: workplaces = [] } = await supabase
-    .from('workplaces')
-    .select('id,user_id,name,address,company_name,created_at,updated_at')
-    .eq('user_id', user.id)
-    .order('updated_at', { ascending: false });
+  // ---------- Workplaces linked to this user (via user_workplaces) ----------
+  const { data: uw = [] } = await supabase
+    .from('user_workplaces')
+    .select('workplace_id')
+    .eq('user_id', user.id);
+
+  const ids = (uw as any[]).map((r) => r.workplace_id);
+  let workplaces: any[] = [];
+  if (ids.length) {
+    const { data } = await supabase
+      .from('workplaces')
+      .select('id,user_id,name,address,company_name,created_at,updated_at')
+      .in('id', ids)
+      .order('updated_at', { ascending: false });
+    workplaces = data ?? [];
+  }
 
   // ---------- This month total (build entries list for client to sum/plot) ----------
   const now = new Date();

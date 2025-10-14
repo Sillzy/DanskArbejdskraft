@@ -1,3 +1,4 @@
+//src/app/admin/documents/DeleteDocButton.tsx
 'use client';
 
 import { useState, useTransition } from 'react';

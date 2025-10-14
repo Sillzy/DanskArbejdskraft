@@ -1,3 +1,4 @@
+//src/app/api/admin/documents/delete/route.ts
 import { NextResponse } from 'next/server';
 import { deleteDocument, getDocument } from '@/../lib/adminDocumentsStore';
 import { unlink } from 'fs/promises';

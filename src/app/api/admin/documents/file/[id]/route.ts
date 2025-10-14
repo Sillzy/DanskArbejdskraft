@@ -1,3 +1,4 @@
+//src/app/api/admin/documents/file/[id]/route.ts
 import { getDocument } from '@/../lib/adminDocumentsStore';
 import { readFile } from 'fs/promises';
 

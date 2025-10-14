@@ -1,3 +1,4 @@
+//src/app/dashboard/workplaces/[id]/parts/RegisterClient.tsx
 'use client';
 
 import * as React from 'react';

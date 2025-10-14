@@ -1,3 +1,4 @@
+//src/app/api/admin/documents/route.ts
 import { NextResponse } from 'next/server';
 import { addDocument } from '@/../lib/adminDocumentsStore';
 import { randomUUID } from 'crypto';
