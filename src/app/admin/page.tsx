@@ -81,20 +81,21 @@ function CreateWorkplaceServerForm() {
     const { data: isAdmin } = await supabase.rpc('is_admin', { p_uid: auth.user.id });
     if (!isAdmin) return;
 
+    // ONE required field (catch-all identifier)
     const name = String(formData.get('name') || '').trim();
-    const site_number = String(formData.get('site_number') || '').trim();
-    const project_number = String(formData.get('project_number') || '').trim();
+    if (!name) return;
+
+    // Optionals
     const company_name = String(formData.get('company_name') || '').trim() || null;
     const address = String(formData.get('address') || '').trim() || null;
     const company_cvr = String(formData.get('company_cvr') || '').trim() || null;
     const invoice_email = String(formData.get('invoice_email') || '').trim() || null;
 
-    if (!name || !site_number || !project_number) return;
-
     await supabase.from('workplaces').insert({
       name,
-      site_number,
-      project_number,
+      // site/project numbers are not collected at creation now
+      site_number: null,
+      project_number: null,
       company_name,
       address,
       company_cvr,
@@ -105,13 +106,23 @@ function CreateWorkplaceServerForm() {
 
   return (
     <form action={create} className="mt-2 grid grid-cols-1 gap-3 lg:grid-cols-3">
-      <input name="name" className="rounded-lg border p-3" placeholder="Project Name" required />
-      <input name="site_number" className="rounded-lg border p-3" placeholder="Site Number" required />
-      <input name="project_number" className="rounded-lg border p-3" placeholder="Project Number" required />
+      {/* Required single identifier */}
+      <input
+        name="name"
+        className="rounded-lg border p-3 lg:col-span-3"
+        placeholder="Project Name / Site no. / Project no. or Address"
+        required
+      />
+      {/* Optionals */}
       <input name="company_name" className="rounded-lg border p-3" placeholder="Company name (optional)" />
-      <input name="address" className="rounded-lg border p-3 lg:col-span-2" placeholder="Full Address (optional)" />
+      <input name="address" className="rounded-lg border p-3 lg:col-span-2" placeholder="Full address (optional)" />
       <input name="company_cvr" className="rounded-lg border p-3" placeholder="CVR (optional)" />
-      <input name="invoice_email" type="email" className="rounded-lg border p-3 lg:col-span-2" placeholder="Invoice email (optional)" />
+      <input
+        name="invoice_email"
+        type="email"
+        className="rounded-lg border p-3 lg:col-span-2"
+        placeholder="Invoice email (optional)"
+      />
       <button
         type="submit"
         className="lg:col-span-3 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-white text-lg font-semibold hover:bg-blue-700"
@@ -357,7 +368,6 @@ export default async function AdminPage() {
                 <tr key={wid} className="border-t align-top">
                   <td className="py-2 pr-3">
                     {/* Active toggle */}
-                    {/* @ts-expect-error Server Action inside Client boundary */}
                     <ActiveToggleClient id={wid} value={(wp as any).is_active ?? true} />
                   </td>
 

@@ -1,4 +1,4 @@
-//src/app/dashboard/parts/DashboardClient.tsx
+// src/app/dashboard/parts/DashboardClient.tsx
 'use client';
 
 import * as React from 'react';
@@ -587,6 +587,11 @@ function AvailableWorkplacesGrid({
     });
     setAdding(null);
     if (!res.ok) {
+      // Friendly message if already added (expect 409 Conflict from API)
+      if (res.status === 409) {
+        alert('Workplace Already added');
+        return;
+      }
       const j = await res.json().catch(() => ({}));
       alert(j?.error || 'Failed to add workplace.');
       return;
@@ -609,11 +614,13 @@ function AvailableWorkplacesGrid({
               type="button"
               disabled={disabled || adding === r.id}
               onClick={() => add(r.id)}
-              className="w-full rounded-xl border p-4 text-left hover:bg-slate-50 disabled:opacity-60"
+              className="w-full rounded-xl bg-blue-600 text-white px-6 py-4 text-lg font-bold hover:bg-blue-700 disabled:opacity-60"
               title="Add workplace"
             >
-              <div className="text-sm text-slate-500">Add +</div>
-              <div className="mt-1 text-base font-semibold">{label}</div>
+              <span className="inline-flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                ADD • {label}
+              </span>
             </button>
           </li>
         );
@@ -652,7 +659,7 @@ export default function DashboardClient({
         .eq('user_id', userId)
         .single();
 
-    if (!cancelled && !error && data?.profile_status) {
+      if (!cancelled && !error && data?.profile_status) {
         setProfileStatus(data.profile_status as any);
       }
     }
@@ -1059,30 +1066,39 @@ export default function DashboardClient({
 
         {/* ---------------- RIGHT: Create + Recent + Stats + All ---------------- */}
         <section className="lg:col-span-2 space-y-6">
-          {/* Create workplace */}
-          <div className="rounded-2xl border bg-white p-5">
-            <h2 className="text-lg font-semibold">Add workplace</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Tap a box to add it to your dashboard. Only workplaces marked <em>Active</em> by Admin are shown.
-            </p>
+          {/* Create workplace (only visible for approved workers) */}
+          {profileStatus === 'approved' ? (
+            <div className="rounded-2xl border bg-white p-5">
+              <h2 className="text-lg font-semibold">Add workplace</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Tap a box to add it to your dashboard. Only workplaces marked <em>Active</em> by Admin are shown.
+              </p>
 
-            <AvailableWorkplacesGrid
-              already={new Set(wps.map((w) => w.id))}
-              onAdded={async (id) => {
-                // pull the just-added workplace so UI updates immediately
-                const { data } = await supabase
-                  .from('workplaces')
-                  .select('id,user_id,name,address,company_name,created_at,updated_at')
-                  .eq('id', id)
-                  .single();
+              <AvailableWorkplacesGrid
+                already={new Set(wps.map((w) => w.id))}
+                onAdded={async (id) => {
+                  // pull the just-added workplace so UI updates immediately
+                  const { data } = await supabase
+                    .from('workplaces')
+                    .select('id,user_id,name,address,company_name,created_at,updated_at')
+                    .eq('id', id)
+                    .single();
 
-                if (data) {
-                  // put it at the top like “recently added”
-                  setWps((prev) => [data as any, ...prev.filter((p) => p.id !== id)]);
-                }
-              }}
-            />
-          </div>
+                  if (data) {
+                    // put it at the top like “recently added”
+                    setWps((prev) => [data as any, ...prev.filter((p) => p.id !== id)]);
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            <div className="rounded-2xl border bg-white p-5">
+              <h2 className="text-lg font-semibold">Add workplace</h2>
+              <div className="mt-3 rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                You can add workplaces once your profile is <span className="font-semibold">approved</span>.
+              </div>
+            </div>
+          )}
 
           {/* Recent workplace */}
           <div className="rounded-2xl border bg-white p-5">
