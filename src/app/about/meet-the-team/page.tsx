@@ -13,8 +13,7 @@ type Worker = {
   last_name: string | null;
   team_title: string | null;
   email: string | null;
-  phone_number: string | null;
-  avatar_url: string | null; // storage path (e.g., "userId/uuid.jpg") or full URL
+  avatar_url: string | null; // storage path or full URL
 };
 
 const CORE_TEAM = [
@@ -23,7 +22,6 @@ const CORE_TEAM = [
     name: 'Alex M.',
     title: 'Direktør',
     email: 'Alex@danskarbejdskraft.dk',
-    phone: null as string | null,
     avatar: '/Alex M.png',
   },
   {
@@ -31,7 +29,6 @@ const CORE_TEAM = [
     name: 'Daniel M.',
     title: 'Formand',
     email: 'Daniel@danskarbejdskraft.dk',
-    phone: null as string | null,
     avatar: '/Daniel M.png',
   },
   {
@@ -39,7 +36,6 @@ const CORE_TEAM = [
     name: 'Alexandra M.',
     title: 'Økonomi',
     email: 'Alexandra@danskarbejdskraft.dk',
-    phone: null as string | null,
     avatar: '/Alexandra M.png',
   },
 ];
@@ -65,10 +61,7 @@ async function withSignedAvatars(rows: Worker[]) {
     .from(AVATAR_BUCKET)
     .createSignedUrls(paths, 3600);
 
-  if (error) {
-    // If signing fails, just return original rows (avatars will show as "no photo")
-    return rows;
-  }
+  if (error) return rows;
 
   const map = new Map<string, string>();
   paths.forEach((p, i) => {
@@ -93,7 +86,7 @@ export default function MeetTheTeamPage() {
     const { data, error } = await supabase
       .from('profiles')
       .select(
-        'user_id, first_name, last_name, team_title, email, phone_number, avatar_url, profile_status'
+        'user_id, first_name, last_name, team_title, email, avatar_url, profile_status'
       )
       .eq('profile_status', 'approved')
       .order('first_name', { ascending: true });
@@ -140,7 +133,7 @@ export default function MeetTheTeamPage() {
             const relevantUpdate =
               payload.eventType === 'UPDATE' &&
               newRow?.profile_status === 'approved' &&
-              ['first_name', 'last_name', 'team_title', 'email', 'phone_number', 'avatar_url'].some(
+              ['first_name', 'last_name', 'team_title', 'email', 'avatar_url'].some(
                 (k) => newRow?.[k] !== oldRow?.[k]
               );
 
@@ -199,7 +192,6 @@ export default function MeetTheTeamPage() {
               name={m.name}
               title={m.title}
               email={m.email}
-              phone={m.phone}
               avatar={m.avatar}
             />
           ))}
@@ -221,7 +213,6 @@ export default function MeetTheTeamPage() {
                 name={formatName(w.first_name, w.last_name)}
                 // No title for skilled workers (intentionally omitted)
                 email={w.email ?? undefined}
-                phone={w.phone_number ?? undefined}
                 avatar={w.avatar_url}
               />
             ))}
@@ -236,13 +227,11 @@ function Card({
   name,
   title,
   email,
-  phone,
   avatar,
 }: {
   name: string;
-  title?: string; // made optional
+  title?: string;
   email?: string | null;
-  phone?: string | null;
   avatar: string | null | undefined;
 }) {
   return (
@@ -272,16 +261,6 @@ function Card({
             className="text-blue-600 underline-offset-2 hover:underline"
           >
             {email}
-          </a>
-        </div>
-      )}
-      {phone && (
-        <div className="text-sm">
-          <a
-            href={`tel:${phone}`}
-            className="text-slate-700 underline-offset-2 hover:underline"
-          >
-            {phone}
           </a>
         </div>
       )}
