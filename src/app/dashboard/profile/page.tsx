@@ -25,6 +25,7 @@ type Profile = {
 
 const COUNTRIES = [
   { label: 'Denmark +45', dial: '+45' },
+  { label: 'Romania +40', dial: '+40' },
   { label: 'Sweden +46', dial: '+46' },
   { label: 'Norway +47', dial: '+47' },
   { label: 'Germany +49', dial: '+49' },

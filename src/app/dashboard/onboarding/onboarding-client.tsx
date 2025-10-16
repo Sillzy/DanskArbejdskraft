@@ -24,6 +24,7 @@ function PhoneRow(props: {
           onChange={(e) => onCountry(e.target.value)}
         >
           <option value="+45">Denmark +45</option>
+          <option value="+40">Romania +40</option>
           <option value="+46">Sweden +46</option>
           <option value="+47">Norway +47</option>
           <option value="+49">Germany +49</option>

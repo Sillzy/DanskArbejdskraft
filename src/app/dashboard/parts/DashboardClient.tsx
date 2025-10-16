@@ -117,6 +117,7 @@ function RegisterTimeModal({
   function openPicker(ref: React.RefObject<HTMLInputElement>) {
     const el = ref.current; if (!el) return;
     try {
+      // Prefer native picker if available
       // @ts-ignore
       if (typeof el.showPicker === 'function') { el.focus({ preventScroll: true }); /* @ts-ignore */ el.showPicker(); return; }
     } catch {}
@@ -153,24 +154,24 @@ function RegisterTimeModal({
 
   const fieldWrap = 'rounded-2xl border p-4 sm:p-5 overflow-hidden cursor-pointer bg-white';
   const fieldInput = 'w-full h-16 sm:h-20 rounded-xl border px-4 text-2xl text-center focus:outline-none focus:ring-2 focus:ring-blue-200 appearance-none [-webkit-appearance:none] [-moz-appearance:textfield] bg-white';
-
   const keyOpen = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
 
   return (
     <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true">
-      {/* IMPORTANT: Backdrop is NOT closable for this modal (prevents picker-induced closes on mobile) */}
+      {/* Backdrop: NOT closable to avoid iOS ghost taps */}
       <div className="absolute inset-0 bg-black/40" />
       <div
         className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8"
+        onClick={(e) => e.stopPropagation()}  // stop bubbling from native picker
       >
         <h3 className="text-2xl font-semibold">Register time</h3>
         {err && <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-base text-red-700">{err}</div>}
+
         <div className="mt-6 grid grid-cols-1 gap-5">
           <div
             className={fieldWrap}
             onClick={() => openPicker(dateRef)}
             onKeyDown={keyOpen(() => openPicker(dateRef))}
-            onTouchStart={() => openPicker(dateRef)}
             role="button"
             tabIndex={0}
             aria-label="Choose date"
@@ -192,7 +193,6 @@ function RegisterTimeModal({
               className={fieldWrap}
               onClick={() => openPicker(startRef)}
               onKeyDown={keyOpen(() => openPicker(startRef))}
-              onTouchStart={() => openPicker(startRef)}
               role="button"
               tabIndex={0}
               aria-label="Choose start time"
@@ -209,11 +209,11 @@ function RegisterTimeModal({
               />
               <p className="mt-2 text-xs text-slate-500">Tap anywhere on this box to open the time wheel</p>
             </div>
+
             <div
               className={fieldWrap}
               onClick={() => openPicker(endRef)}
               onKeyDown={keyOpen(() => openPicker(endRef))}
-              onTouchStart={() => openPicker(endRef)}
               role="button"
               tabIndex={0}
               aria-label="Choose end time"
@@ -236,7 +236,7 @@ function RegisterTimeModal({
             <label className="block text-slate-600 text-base mb-2">Break (minutes)</label>
             <div className="relative">
               <select
-                className={'w-full h-16 rounded-xl border p-4 text-xl pr-10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 appearance-none [-webkit-appearance:none]'}
+                className="w-full h-16 rounded-xl border p-4 text-xl pr-10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 appearance-none [-webkit-appearance:none]"
                 value={breakMin}
                 onChange={(e) => setBreakMin(parseInt(e.target.value, 10))}
               >
@@ -246,6 +246,7 @@ function RegisterTimeModal({
             </div>
           </div>
         </div>
+
         <div className="mt-7 flex gap-4">
           <button type="button" className="flex-1 rounded-xl border px-5 py-4 text-lg hover:bg-slate-50" onClick={() => onClose()}>Cancel</button>
           <button type="button" className="flex-1 rounded-xl bg-blue-600 text-white px-5 py-4 text-lg hover:bg-blue-700 disabled:opacity-60" disabled={saving} onClick={submit}>

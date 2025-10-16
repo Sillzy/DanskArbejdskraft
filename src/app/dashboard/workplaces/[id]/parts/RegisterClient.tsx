@@ -182,10 +182,7 @@ function RegisterTimeModal({
   editEntry: TimeEntry | null;
 }) {
   const today = React.useMemo(() => {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+    const d = new Date(); const yyyy = d.getFullYear(); const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
@@ -217,22 +214,21 @@ function RegisterTimeModal({
   const dateRef = React.useRef<HTMLInputElement>(null);
   const startRef = React.useRef<HTMLInputElement>(null);
   const endRef = React.useRef<HTMLInputElement>(null);
+
   function openPicker(ref: React.RefObject<HTMLInputElement>) {
-    const el = ref.current;
-    if (!el) return;
-    // @ts-expect-error
-    if (typeof el.showPicker === 'function') el.showPicker();
-    el.focus();
+    const el = ref.current; if (!el) return;
+    try {
+      // @ts-ignore
+      if (typeof el.showPicker === 'function') { el.focus({ preventScroll: true }); /* @ts-ignore */ el.showPicker(); return; }
+    } catch {}
+    el.focus({ preventScroll: true });
+    el.click();
   }
 
   async function saveReplaceByLocalDay() {
     const startISO = toISOLocal(workDate, start);
     const endISO = toISOLocal(workDate, end);
-
-    if (!(new Date(endISO) > new Date(startISO))) {
-      setErr('End time must be after start time.');
-      return;
-    }
+    if (!(new Date(endISO) > new Date(startISO))) { setErr('End time must be after start time.'); return; }
 
     setSaving(true);
     setErr(null);
@@ -248,11 +244,7 @@ function RegisterTimeModal({
     });
 
     setSaving(false);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
+    if (error) { setErr(error.message); return; }
     onClose(true);
   }
 
@@ -260,8 +252,14 @@ function RegisterTimeModal({
 
   return (
     <div className="fixed inset-0 z-[80]">
-      <div className="absolute inset-0 bg-black/40" onClick={() => onClose()} />
-      <div className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8">
+      {/* Backdrop WITHOUT a click handler (prevents iOS wheel from closing the modal) */}
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="absolute inset-x-0 bottom-0 md:inset-0 md:m-auto md:h-fit md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl shadow-xl p-6 sm:p-8"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
         <h3 className="text-2xl font-semibold">
           {editEntry ? 'Change work time' : 'Register time'}
         </h3>
@@ -276,6 +274,7 @@ function RegisterTimeModal({
           <div
             className="rounded-2xl border p-4 sm:p-5 cursor-pointer"
             onClick={() => openPicker(dateRef)}
+            tabIndex={0}
           >
             <label className="block text-slate-600 text-base mb-2">Date</label>
             <input
@@ -284,6 +283,8 @@ function RegisterTimeModal({
               className="w-full rounded-xl border p-4 text-xl sm:text-2xl tracking-wide"
               value={workDate}
               onChange={(e) => setWorkDate(e.target.value)}
+              readOnly
+              inputMode="none"
             />
           </div>
 
@@ -291,6 +292,7 @@ function RegisterTimeModal({
             <div
               className="rounded-2xl border p-4 sm:p-5 cursor-pointer"
               onClick={() => openPicker(startRef)}
+              tabIndex={0}
             >
               <label className="block text-slate-600 text-base mb-2">Start time</label>
               <input
@@ -299,6 +301,8 @@ function RegisterTimeModal({
                 className="w-full rounded-xl border p-4 text-2xl h-16 sm:h-20 text-center"
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
+                readOnly
+                inputMode="none"
               />
               <p className="mt-2 text-xs text-slate-500">Tap anywhere on this box to open the time wheel</p>
             </div>
@@ -306,6 +310,7 @@ function RegisterTimeModal({
             <div
               className="rounded-2xl border p-4 sm:p-5 cursor-pointer"
               onClick={() => openPicker(endRef)}
+              tabIndex={0}
             >
               <label className="block text-slate-600 text-base mb-2">End time</label>
               <input
@@ -314,6 +319,8 @@ function RegisterTimeModal({
                 className="w-full rounded-xl border p-4 text-2xl h-16 sm:h-20 text-center"
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
+                readOnly
+                inputMode="none"
               />
               <p className="mt-2 text-xs text-slate-500">Tap anywhere on this box to open the time wheel</p>
             </div>
