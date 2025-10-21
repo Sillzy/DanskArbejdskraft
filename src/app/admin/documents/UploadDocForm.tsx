@@ -86,8 +86,8 @@ export default function UploadDocForm() {
           <option value="Payslip">Payslip</option>
           <option value="Invoice">Invoice</option>
           <option value="Policy">Policy</option>
-          <option value="Procedure">Procedure</option>
-          <option value="Template">Template</option>
+          <option value="Procurement">Procurement</option>
+          <option value="Timesheet">Timesheet</option>
           <option value="Report">Report</option>
           <option value="Other">Other</option>
         </select>
