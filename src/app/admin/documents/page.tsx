@@ -1,11 +1,11 @@
-// src/app/admin/documents/page.tsx
+//src/app/admin/documents/page.tsx
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Upload, Download, Info } from 'lucide-react';
 
 import { listDocuments, type AdminDocument } from '@/../lib/adminDocumentsStore';
-import UploadDocForm from './UploadDocForm';        // <== colocated client component
-import { DeleteDocButton } from './DeleteDocButton'; // <== colocated client component
+import UploadDocForm from './UploadDocForm';
+import { DeleteDocButton } from './DeleteDocButton';
 
 export const metadata: Metadata = {
   title: 'Admin — Documents',
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Page() {
-  const docs = listDocuments();
+  const docs = await listDocuments(); // <- now async
 
   const contracts = docs.filter((d) => d.type === 'Contract');
   const payslips = docs.filter((d) => d.type === 'Payslip');
@@ -76,8 +76,6 @@ export default async function Page() {
   );
 }
 
-/* ---------- Helpers (server-safe) ---------- */
-
 function DocSection({
   title,
   items,
@@ -120,7 +118,6 @@ function DocSection({
                     Download
                   </a>
 
-                  {/* Delete in-place (client button triggers API + refresh) */}
                   <DeleteDocButton id={d.id} />
                 </div>
               </div>

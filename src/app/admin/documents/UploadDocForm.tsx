@@ -1,5 +1,4 @@
 //src/app/admin/documents/UploadDocForm.tsx
-
 'use client';
 
 import { useRef, useState } from 'react';
@@ -36,7 +35,7 @@ export default function UploadDocForm() {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.ok !== true) {
-        setMsg('Upload failed. Please try again.');
+        setMsg(data?.error || 'Upload failed. Please try again.');
         return;
       }
 
@@ -44,7 +43,6 @@ export default function UploadDocForm() {
       formRef.current.reset();
       setMsg('Uploaded successfully.');
       router.refresh();
-      // optional: clear success after a short delay
       setTimeout(() => setMsg(null), 2500);
     } catch {
       setMsg('Upload failed. Please try again.');

@@ -1,15 +1,36 @@
 //src/app/api/admin/documents/route.ts
 import { NextResponse } from 'next/server';
-import { addDocument } from '@/../lib/adminDocumentsStore';
-import { randomUUID } from 'crypto';
-import { mkdir, writeFile } from 'fs/promises';
-import { join, parse } from 'path';
+import { getServerSupabase } from '@/../lib/supabase-server';
+import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const BUCKET = 'admin-documents';
+
+function sanitizeFilename(name: string) {
+  return name.normalize('NFKD').replace(/[^\w.\-]+/g, '_');
+}
+
+function serviceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
 export async function POST(req: Request) {
   try {
+    // Verify user is admin (via your RPC)
+    const supabase = await getServerSupabase();
+    const { data: ures } = await supabase.auth.getUser();
+    const user = ures?.user ?? null;
+    if (!user?.id) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+
+    const { data: isAdm } = await supabase.rpc('is_admin', { p_uid: user.id });
+    if (!isAdm) return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 });
+
     const form = await req.formData();
 
     // Honeypot
@@ -17,42 +38,55 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    const rawTitle = String(form.get('title') || '').trim(); // may be empty
+    const rawTitle = String(form.get('title') || '').trim();
     const type = String(form.get('type') || '').trim();
-    const description = String(form.get('description') || '').trim();
+    const description = (String(form.get('description') || '').trim() || null) as string | null;
     const file = form.get('file') as File | null;
 
     if (!type || !file) {
       return NextResponse.json({ ok: false, error: 'Missing fields' }, { status: 400 });
     }
 
-    const arrayBuf = await file.arrayBuffer();
-    const buf = Buffer.from(arrayBuf);
+    const s = serviceClient();
 
-    const uploadsDir = join(process.cwd(), '.uploads');
-    await mkdir(uploadsDir, { recursive: true });
+    // Upload to Storage (private bucket)
+    const safeName = sanitizeFilename(file.name || 'file.bin');
+    const path = `uploads/${Date.now()}_${safeName}`;
 
-    const id = randomUUID();
-    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-    const diskPath = join(uploadsDir, `${id}__${safeName}`);
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const { error: upErr } = await s.storage
+      .from(BUCKET)
+      .upload(path, bytes, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: false,
+      });
 
-    await writeFile(diskPath, buf);
+    if (upErr) {
+      return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 });
+    }
 
-    // Fallback: use filename (without extension) as title when blank
-    const fallbackTitle = parse(file.name).name;
-    const title = rawTitle || fallbackTitle;
+    // Insert metadata
+    const title = rawTitle || safeName.replace(/\.[^.]+$/, '');
+    const { data: row, error: insErr } = await s
+      .from('admin_documents')
+      .insert({
+        title,
+        type,
+        description,
+        storage_path: path,
+        created_by: user.id,
+      })
+      .select('id')
+      .single();
 
-    addDocument({
-      title,
-      type,
-      description,
-      originalName: file.name,
-      mimeType: file.type || 'application/octet-stream',
-      diskPath,
-    });
+    if (insErr) {
+      // rollback storage on failure
+      await s.storage.from(BUCKET).remove([path]).catch(() => {});
+      return NextResponse.json({ ok: false, error: insErr.message }, { status: 500 });
+    }
 
-    return NextResponse.json({ ok: true });
-  } catch (e) {
+    return NextResponse.json({ ok: true, id: row.id });
+  } catch (e: any) {
     console.error('Upload error', e);
     return NextResponse.json({ ok: false, error: 'Server error' }, { status: 500 });
   }
